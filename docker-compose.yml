@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Production API server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: md2cf-rest:latest
+    container_name: md2cf-api
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  # Development API server with hot-reload
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: md2cf-rest:dev
+    container_name: md2cf-api-dev
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debugger port
+    volumes:
+      - ./md2cf:/app/md2cf
+      - ./examples:/app/examples
+      - ./scripts:/app/scripts
+    environment:
+      - LOG_LEVEL=debug
+      - PYTHONUNBUFFERED=1
+    command: uvicorn md2cf.rest_api:app --host 0.0.0.0 --port 8000 --reload
+    profiles:
+      - dev
+
+  # OpenAPI watcher
+  watcher:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: md2cf-rest:dev
+    container_name: md2cf-watcher
+    volumes:
+      - ./md2cf:/app/md2cf
+      - ./scripts:/app/scripts
+      - ./:/app/output
+    command: python scripts/watch-and-export.py
+    profiles:
+      - dev
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: md2cf-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    profiles:
+      - production
+
+networks:
+  default:
+    name: md2cf-network

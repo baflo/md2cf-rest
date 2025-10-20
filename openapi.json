@@ -1,0 +1,351 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "md2cf REST API",
+    "description": "Convert Markdown to Confluence Storage Format and publish to Confluence",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Root endpoint - health check.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "description": "Health check endpoint.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/convert": {
+      "post": {
+        "summary": "Convert Markdown",
+        "description": "Convert Markdown to Confluence Storage Format.\n\nArgs:\n    request: ConvertRequest containing the Markdown content\n\nReturns:\n    ConvertResponse with the converted content\n\nRaises:\n    HTTPException: If conversion fails",
+        "operationId": "convert_markdown_convert_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConvertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvertResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/publish": {
+      "post": {
+        "summary": "Publish To Confluence",
+        "description": "Convert Markdown and publish to Confluence.\n\nArgs:\n    request: PublishRequest containing the Markdown and Confluence details\n\nReturns:\n    PublishResponse with the created/updated page information\n\nRaises:\n    HTTPException: If conversion or publishing fails",
+        "operationId": "publish_to_confluence_publish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ConvertRequest": {
+        "properties": {
+          "markdown": {
+            "type": "string",
+            "title": "Markdown",
+            "description": "Markdown content to convert"
+          }
+        },
+        "type": "object",
+        "required": [
+          "markdown"
+        ],
+        "title": "ConvertRequest",
+        "description": "Request model for Markdown conversion.",
+        "example": {
+          "markdown": "# Hello World\n\nThis is **bold** text."
+        }
+      },
+      "ConvertResponse": {
+        "properties": {
+          "confluence_storage_format": {
+            "type": "string",
+            "title": "Confluence Storage Format",
+            "description": "Converted Confluence Storage Format"
+          },
+          "character_count": {
+            "type": "integer",
+            "title": "Character Count",
+            "description": "Number of characters in output"
+          }
+        },
+        "type": "object",
+        "required": [
+          "confluence_storage_format",
+          "character_count"
+        ],
+        "title": "ConvertResponse",
+        "description": "Response model for Markdown conversion.",
+        "example": {
+          "character_count": 55,
+          "confluence_storage_format": "<h1>Hello World</h1>\n<p>This is <strong>bold</strong> text.</p>\n"
+        }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Service status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "description": "API version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "HealthResponse",
+        "description": "Response model for health check."
+      },
+      "PublishRequest": {
+        "properties": {
+          "markdown": {
+            "type": "string",
+            "title": "Markdown",
+            "description": "Markdown content to convert and publish"
+          },
+          "confluence_url": {
+            "type": "string",
+            "title": "Confluence Url",
+            "description": "Confluence base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token or API token"
+          },
+          "space": {
+            "type": "string",
+            "title": "Space",
+            "description": "Space key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Page title"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Parent page ID (optional)"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is Confluence Cloud (vs Server)",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "markdown",
+          "confluence_url",
+          "token",
+          "space",
+          "title"
+        ],
+        "title": "PublishRequest",
+        "description": "Request model for publishing to Confluence.",
+        "example": {
+          "cloud": true,
+          "confluence_url": "https://your-domain.atlassian.net/wiki",
+          "markdown": "# My Documentation\n\nThis is my content.",
+          "space": "DEMO",
+          "title": "My Page",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "PublishResponse": {
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "title": "Page Id",
+            "description": "Created/updated page ID"
+          },
+          "page_url": {
+            "type": "string",
+            "title": "Page Url",
+            "description": "URL to the page"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Page title"
+          },
+          "space": {
+            "type": "string",
+            "title": "Space",
+            "description": "Space key"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Page version number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page_id",
+          "page_url",
+          "title",
+          "space",
+          "version"
+        ],
+        "title": "PublishResponse",
+        "description": "Response model for publishing to Confluence.",
+        "example": {
+          "page_id": "123456",
+          "page_url": "https://your-domain.atlassian.net/wiki/spaces/DEMO/pages/123456",
+          "space": "DEMO",
+          "title": "My Page",
+          "version": 1
+        }
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

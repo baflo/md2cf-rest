@@ -1,0 +1,35 @@
+# Development Dockerfile with hot-reload and debugging
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY pyproject.toml README.md ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install -e ".[dev,rest]" && \
+    pip install watchdog debugpy
+
+# Copy application code
+COPY md2cf/ ./md2cf/
+COPY examples/ ./examples/
+COPY scripts/ ./scripts/
+
+# Expose ports
+EXPOSE 8000
+EXPOSE 5678
+
+# Development server with auto-reload
+CMD ["uvicorn", "md2cf.rest_api:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--reload"]
