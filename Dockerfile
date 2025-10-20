@@ -35,7 +35,8 @@ COPY md2cf/ ./md2cf/
 # Install dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -e ".[rest]" && \
-    pip install --no-cache-dir gunicorn
+    pip install --no-cache-dir gunicorn && \
+    pip install --no-cache-dir pip-system-certs
 
 # Stage 2: Runtime
 FROM python:3.12-slim
