@@ -9,7 +9,6 @@ import logging
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
-import requests
 from atlassian import Confluence
 
 
@@ -61,6 +60,40 @@ class ConfluenceClient:
         )
 
         logger.info(f"Initialized Confluence client for {self.url}")
+
+    def get_page_by_id(
+        self,
+        page_id: str,
+        expand: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a page by ID.
+
+        Args:
+            page_id: Page ID
+            expand: Optional comma-separated list of properties to expand
+
+        Returns:
+            Page data dictionary or None if not found
+
+        Example:
+            >>> page = client.get_page_by_id("123456")
+            >>> if page:
+            ...     print(f"Page title: {page['title']}")
+        """
+        try:
+            result = self.confluence.get_page_by_id(
+                page_id=page_id,
+                expand=expand or "version,space,ancestors,history",
+            )
+            if result:
+                logger.info(f"Found page with ID {page_id}: '{result.get('title')}'")
+                return result
+            logger.warning(f"Page with ID {page_id} not found")
+            return None
+        except Exception as e:
+            logger.error(f"Error getting page by ID {page_id}: {e}")
+            raise
 
     def get_page_by_title(
         self,
@@ -185,7 +218,7 @@ class ConfluenceClient:
                 page_id=page_id,
                 title=title,
                 body=body,
-                parent_id=parent_id,
+                # parent_id=parent_id,
                 type="page",
                 representation=representation,
                 minor_edit=minor_edit,
@@ -262,8 +295,12 @@ class ConfluenceClient:
             >>> url = client.get_page_url(page)
             >>> print(f"View at: {url}")
         """
-        base_url = page.get("_links", {}).get("base", self.url)
-        web_ui = page.get("_links", {}).get("webui", "")
+        base_url = page.get("_links", {}).get("base", self.url) + "/"
+        web_ui = "./" + page.get("_links", {}).get("webui", "")
+        print("base_url:", base_url)
+        print("web_ui:", web_ui)
+        print("join", urljoin(base_url, web_ui))
+        print(page)
         return urljoin(base_url, web_ui)
 
     def delete_page(self, page_id: str) -> None:
@@ -306,4 +343,104 @@ class ConfluenceClient:
             return None
         except Exception as e:
             logger.error(f"Error getting space '{space_key}': {e}")
+            raise
+
+    def get_spaces(
+        self,
+        search_query: Optional[str] = None,
+        limit: int = 25,
+    ) -> list[Dict[str, Any]]:
+        """
+        Get list of spaces accessible to the user.
+
+        Args:
+            search_query: Optional search filter for space name or key
+            limit: Maximum number of spaces to return
+
+        Returns:
+            List of space data dictionaries
+
+        Example:
+            >>> spaces = client.get_spaces(search_query="DEMO", limit=10)
+            >>> for space in spaces:
+            ...     print(f"{space['key']}: {space['name']}")
+        """
+        try:
+            # Build params dict only if search_query is provided
+            params = {'query': search_query} if search_query else {}
+            all_spaces = self.confluence.get("/rest/spacedirectory/1/search", None, None, params)
+
+            if not all_spaces or "spaces" not in all_spaces:
+                logger.warning("No spaces found")
+                return []
+
+            spaces = all_spaces["spaces"]
+
+            logger.info(f"Found {len(spaces)} spaces")
+            return spaces[:limit]
+
+        except Exception as e:
+            logger.error(f"Error getting spaces: {e}")
+            raise
+
+    def search_pages(
+        self,
+        query: str,
+        space: Optional[str] = None,
+        limit: int = 25,
+    ) -> list[Dict[str, Any]]:
+        """
+        Search for pages using CQL (Confluence Query Language).
+
+        Args:
+            query: Search query (title or text search)
+            space: Optional space key to restrict search
+            limit: Maximum number of results to return
+
+        Returns:
+            List of page data dictionaries
+
+        Example:
+            >>> pages = client.search_pages("documentation", space="DEMO", limit=10)
+            >>> for page in pages:
+            ...     print(f"{page['title']} (ID: {page['id']})")
+        """
+        try:
+            # Build CQL query
+            cql_parts = [f'type=page']
+
+            # Add text search for title or content
+            if query:
+                # Escape special characters in CQL
+                escaped_query = query.replace('"', '\\"')
+                cql_parts.append(f'({" OR ".join(filter(str.strip, (
+                    f'title ~ "{escaped_query}"',
+                    f'title ~ "{escaped_query}*"',
+                    f'text ~ "{escaped_query}"',
+                    f'text ~ "{escaped_query}*"',
+                    escaped_query.isdigit() and f'id = {escaped_query}' or '',
+                    )))})')
+
+            # Add space restriction if provided
+            if space:
+                cql_parts.append(f'space="{space}"')
+
+            cql = ' AND '.join(cql_parts)
+
+            logger.info(f"Searching pages with CQL: {cql}")
+
+            # Use Confluence search API
+            result = self.confluence.cql(
+                cql=cql,
+                limit=limit,
+                expand="space,version,body.view"
+            )
+
+            pages = result.get("results", [])
+            logger.info(f"Found {len(pages)} pages")
+
+            return pages
+
+        except Exception as e:
+            logger.error(f"Error searching pages: {e}")
             raise

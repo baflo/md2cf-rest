@@ -93,6 +93,214 @@ class PublishResponse(BaseModel):
         }
 
 
+class SpaceInfo(BaseModel):
+    """Model for a single space."""
+
+    key: str = Field(..., description="Space key")
+    name: str = Field(..., description="Space name")
+    type: str = Field(..., description="Space type (global, personal)")
+    url: Optional[str] = Field(None, description="Space URL")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "key": "DEMO",
+                "name": "Demo Space",
+                "type": "global",
+                "url": "/wiki/spaces/DEMO"
+            }
+        }
+
+
+class SpacesRequest(BaseModel):
+    """Request model for listing spaces."""
+
+    confluence_url: str = Field(..., description="Confluence base URL")
+    token: str = Field(..., description="Personal Access Token or API token")
+    cloud: bool = Field(True, description="Whether this is Confluence Cloud (vs Server)")
+    search: Optional[str] = Field(None, description="Optional search filter for space name or key")
+    limit: int = Field(25, ge=1, le=100, description="Maximum number of spaces to return")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "confluence_url": "https://your-domain.atlassian.net/wiki",
+                "token": "YOUR_TOKEN_HERE",
+                "cloud": True,
+                "search": "DEMO",
+                "limit": 25
+            }
+        }
+
+
+class SpacesResponse(BaseModel):
+    """Response model for listing spaces."""
+
+    spaces: list[SpaceInfo] = Field(..., description="List of accessible spaces")
+    total: int = Field(..., description="Total number of spaces returned")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "spaces": [
+                    {
+                        "key": "DEMO",
+                        "name": "Demo Space",
+                        "type": "global",
+                        "url": "/wiki/spaces/DEMO"
+                    }
+                ],
+                "total": 1
+            }
+        }
+
+
+class SearchPagesRequest(BaseModel):
+    """Request model for searching pages."""
+
+    confluence_url: str = Field(..., description="Confluence base URL")
+    token: str = Field(..., description="Personal Access Token or API token")
+    cloud: bool = Field(True, description="Whether this is Confluence Cloud (vs Server)")
+    query: str = Field(..., description="Search query for page title or content")
+    space: Optional[str] = Field(None, description="Optional space key to restrict search")
+    limit: int = Field(25, ge=1, le=100, description="Maximum number of pages to return")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "confluence_url": "https://your-domain.atlassian.net/wiki",
+                "token": "YOUR_TOKEN_HERE",
+                "cloud": True,
+                "query": "documentation",
+                "space": "DEMO",
+                "limit": 25
+            }
+        }
+
+
+class PageInfo(BaseModel):
+    """Model for a single page."""
+
+    id: str = Field(..., description="Page ID")
+    title: str = Field(..., description="Page title")
+    space_key: str = Field(..., description="Space key")
+    url: Optional[str] = Field(None, description="Page URL")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "123456",
+                "title": "My Documentation Page",
+                "space_key": "DEMO",
+                "url": "/wiki/spaces/DEMO/pages/123456"
+            }
+        }
+
+
+class SearchPagesResponse(BaseModel):
+    """Response model for searching pages."""
+
+    pages: list[PageInfo] = Field(..., description="List of found pages")
+    total: int = Field(..., description="Total number of pages found")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "pages": [
+                    {
+                        "id": "123456",
+                        "title": "My Documentation Page",
+                        "space_key": "DEMO",
+                        "url": "/wiki/spaces/DEMO/pages/123456"
+                    }
+                ],
+                "total": 1
+            }
+        }
+
+
+class GetSpaceRequest(BaseModel):
+    """Request model for getting a space by key."""
+
+    confluence_url: str = Field(..., description="Confluence base URL")
+    token: str = Field(..., description="Personal Access Token or API token")
+    cloud: bool = Field(True, description="Whether this is Confluence Cloud (vs Server)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "confluence_url": "https://your-domain.atlassian.net/wiki",
+                "token": "YOUR_TOKEN_HERE",
+                "cloud": True
+            }
+        }
+
+
+class SpaceDetailResponse(BaseModel):
+    """Response model for space details."""
+
+    key: str = Field(..., description="Space key")
+    name: str = Field(..., description="Space name")
+    type: str = Field(..., description="Space type (global, personal)")
+    url: Optional[str] = Field(None, description="Space URL")
+    description: Optional[str] = Field(None, description="Space description")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "key": "DEMO",
+                "name": "Demo Space",
+                "type": "global",
+                "url": "/wiki/spaces/DEMO",
+                "description": "This is a demo space for testing"
+            }
+        }
+
+
+class GetPageRequest(BaseModel):
+    """Request model for getting a page by ID."""
+
+    confluence_url: str = Field(..., description="Confluence base URL")
+    token: str = Field(..., description="Personal Access Token or API token")
+    cloud: bool = Field(True, description="Whether this is Confluence Cloud (vs Server)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "confluence_url": "https://your-domain.atlassian.net/wiki",
+                "token": "YOUR_TOKEN_HERE",
+                "cloud": True
+            }
+        }
+
+
+class PageDetailResponse(BaseModel):
+    """Response model for page details."""
+
+    id: str = Field(..., description="Page ID")
+    title: str = Field(..., description="Page title")
+    space_key: str = Field(..., description="Space key")
+    url: Optional[str] = Field(None, description="Page URL")
+    version: int = Field(..., description="Page version number")
+    parent_id: Optional[str] = Field(None, description="Parent page ID")
+    created_at: Optional[str] = Field(None, description="Creation timestamp")
+    updated_at: Optional[str] = Field(None, description="Last update timestamp")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "123456",
+                "title": "My Documentation Page",
+                "space_key": "DEMO",
+                "url": "/wiki/spaces/DEMO/pages/123456",
+                "version": 5,
+                "parent_id": "123455",
+                "created_at": "2024-01-01T12:00:00.000Z",
+                "updated_at": "2024-01-15T14:30:00.000Z"
+            }
+        }
+
+
 class HealthResponse(BaseModel):
     """Response model for health check."""
 
@@ -219,6 +427,221 @@ async def publish_to_confluence(request: PublishRequest) -> PublishResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Publishing failed: {str(e)}"
+        )
+
+
+@app.post("/spaces", response_model=SpacesResponse, status_code=status.HTTP_200_OK)
+async def list_spaces(request: SpacesRequest) -> SpacesResponse:
+    """
+    List accessible Confluence spaces.
+
+    Args:
+        request: SpacesRequest containing Confluence credentials and optional filter
+
+    Returns:
+        SpacesResponse with list of accessible spaces
+
+    Raises:
+        HTTPException: If listing spaces fails
+    """
+    try:
+        # Initialize Confluence client
+        client = ConfluenceClient(
+            url=request.confluence_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Get accessible spaces
+        spaces = client.get_spaces(
+            search_query=request.search,
+            limit=request.limit
+        )
+
+        space_list = [
+            SpaceInfo(
+                key=space["key"],
+                name=space["name"],
+                type=space.get("type", "global"),
+                url=space.get("_links", {}).get("webui")
+            )
+            for space in spaces
+        ]
+
+        return SpacesResponse(
+            spaces=space_list,
+            total=len(space_list)
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to list spaces: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list spaces: {str(e)}"
+        )
+
+
+@app.post("/space/{space_key}", response_model=SpaceDetailResponse, status_code=status.HTTP_200_OK)
+async def get_space(space_key: str, request: GetSpaceRequest) -> SpaceDetailResponse:
+    """
+    Get detailed information about a Confluence space by its key.
+
+    Args:
+        space_key: Space key (from path parameter)
+        request: GetSpaceRequest containing Confluence credentials
+
+    Returns:
+        SpaceDetailResponse with space details
+
+    Raises:
+        HTTPException: If space not found or retrieval fails
+    """
+    try:
+        # Initialize Confluence client
+        client = ConfluenceClient(
+            url=request.confluence_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Get space information
+        space = client.get_space(space_key)
+
+        if not space:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Space '{space_key}' not found"
+            )
+
+        return SpaceDetailResponse(
+            key=space["key"],
+            name=space["name"],
+            type=space.get("type", "global"),
+            url=space.get("_links", {}).get("webui"),
+            description=space.get("description", {}).get("plain", {}).get("value") if isinstance(space.get("description"), dict) else None
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get space '{space_key}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get space: {str(e)}"
+        )
+
+
+@app.post("/page/{page_id}", response_model=PageDetailResponse, status_code=status.HTTP_200_OK)
+async def get_page(page_id: str, request: GetPageRequest) -> PageDetailResponse:
+    """
+    Get detailed information about a Confluence page by its ID.
+
+    Args:
+        page_id: Page ID (from path parameter)
+        request: GetPageRequest containing Confluence credentials
+
+    Returns:
+        PageDetailResponse with page details
+
+    Raises:
+        HTTPException: If page not found or retrieval fails
+    """
+    try:
+        # Initialize Confluence client
+        client = ConfluenceClient(
+            url=request.confluence_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Get page information
+        page = client.get_page_by_id(page_id)
+
+        if not page:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Page with ID '{page_id}' not found"
+            )
+
+        # Extract parent ID from ancestors if available
+        parent_id = None
+        ancestors = page.get("ancestors", [])
+        if ancestors and len(ancestors) > 0:
+            parent_id = ancestors[-1].get("id")
+
+        # Extract timestamps
+        created_at = page.get("history", {}).get("createdDate")
+        updated_at = page.get("version", {}).get("when")
+
+        return PageDetailResponse(
+            id=page["id"],
+            title=page["title"],
+            space_key=page.get("space", {}).get("key"),
+            url=page.get("_links", {}).get("webui"),
+            version=page.get("version", {}).get("number", 1),
+            parent_id=parent_id,
+            created_at=created_at,
+            updated_at=updated_at
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get page '{page_id}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get page: {str(e)}"
+        )
+
+
+@app.post("/search-pages", response_model=SearchPagesResponse, status_code=status.HTTP_200_OK)
+async def search_pages(request: SearchPagesRequest) -> SearchPagesResponse:
+    """
+    Search for Confluence pages by title or content.
+
+    Args:
+        request: SearchPagesRequest containing search query and optional space filter
+
+    Returns:
+        SearchPagesResponse with list of matching pages
+
+    Raises:
+        HTTPException: If search fails
+    """
+    try:
+        # Initialize Confluence client
+        client = ConfluenceClient(
+            url=request.confluence_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Search for pages
+        pages = client.search_pages(
+            query=request.query,
+            space=request.space,
+            limit=request.limit
+        )
+
+        page_list = [
+            PageInfo(
+                id=page["content"]["id"],
+                title=page["content"]["title"],
+                space_key=page["content"].get("_expandable", {}).get("space"),
+                url=page["content"].get("_links", {}).get("webui")
+            )
+            for page in pages
+        ]
+
+        return SearchPagesResponse(
+            pages=page_list,
+            total=len(page_list)
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to search pages: {str(e)}"
         )
 
 
