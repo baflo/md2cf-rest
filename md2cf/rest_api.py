@@ -6,11 +6,13 @@ to Confluence Storage Format and publishing to Confluence.
 """
 
 import logging
-from typing import Optional
+from typing import Annotated, List, Optional, Union
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, UploadFile, Depends, File, Form, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import tempfile
+from pathlib import Path as PathLib
 
 from md2cf.converter import MarkdownToConfluence
 from md2cf.api.confluence import ConfluenceClient
@@ -59,18 +61,6 @@ class PublishRequest(BaseModel):
     parent_id: Optional[str] = Field(None, description="Parent page ID (optional)")
     cloud: bool = Field(True, description="Whether this is Confluence Cloud (vs Server)")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "markdown": "# My Documentation\n\nThis is my content.",
-                "confluence_url": "https://your-domain.atlassian.net/wiki",
-                "token": "YOUR_TOKEN_HERE",
-                "space": "DEMO",
-                "title": "My Page",
-                "cloud": True
-            }
-        }
-
 
 class PublishResponse(BaseModel):
     """Response model for publishing to Confluence."""
@@ -80,6 +70,8 @@ class PublishResponse(BaseModel):
     title: str = Field(..., description="Page title")
     space: str = Field(..., description="Space key")
     version: int = Field(..., description="Page version number")
+    attachments_uploaded: int = Field(0, description="Number of attachments uploaded")
+    attachments_failed: int = Field(0, description="Number of attachments that failed to upload")
 
     class Config:
         json_schema_extra = {
@@ -88,7 +80,9 @@ class PublishResponse(BaseModel):
                 "page_url": "https://your-domain.atlassian.net/wiki/spaces/DEMO/pages/123456",
                 "title": "My Page",
                 "space": "DEMO",
-                "version": 1
+                "version": 1,
+                "attachments_uploaded": 2,
+                "attachments_failed": 0
             }
         }
 
@@ -368,26 +362,87 @@ async def convert_markdown(request: ConvertRequest) -> ConvertResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Conversion failed: {str(e)}"
         )
+    
+def publish_request_form(
+    markdown: str = Form(..., description="Markdown content to convert and publish"),
+    confluence_url: str = Form(..., description="Confluence base URL"),
+    token: str = Form(..., description="Personal Access Token or API token"),
+    space: str = Form(..., description="Space key"),
+    title: str = Form(..., description="Page title"),
+    parent_id: Optional[str] = Form(None, description="Parent page ID (optional)"),
+    cloud: bool = Form(True, description="Whether this is Confluence Cloud (vs Server)"),
+) -> PublishRequest:
+    """Helper function to create PublishRequest from form data."""
+    return PublishRequest(
+        markdown=markdown,
+        confluence_url=confluence_url,
+        token=token,
+        space=space,
+        title=title,
+        parent_id=parent_id,
+        cloud=cloud
+    )
 
 
 @app.post("/publish", response_model=PublishResponse, status_code=status.HTTP_201_CREATED)
-async def publish_to_confluence(request: PublishRequest) -> PublishResponse:
+async def publish_to_confluence(
+    request: PublishRequest = Depends(publish_request_form),
+    attachments: List[UploadFile] = None,
+) -> PublishResponse:
     """
-    Convert Markdown and publish to Confluence.
+    Convert Markdown and publish to Confluence with optional attachments.
+
+    This endpoint accepts:
+    - Markdown content as form data (via PublishRequest model)
+    - Optional multiple file attachments
+    - Confluence connection details
+
+    Images referenced in the Markdown (e.g., ![alt](image.png)) will be automatically
+    linked to uploaded attachments with matching filenames.
+
+    Supports both:
+    - Publishing without attachments (form data only)
+    - Publishing with attachments (form data + files)
 
     Args:
-        request: PublishRequest containing the Markdown and Confluence details
+        request: PublishRequest containing all form data fields
+        attachments: Optional list of attachment files to upload (default: empty list)
 
     Returns:
-        PublishResponse with the created/updated page information
+        PublishResponse with the created/updated page information and attachment status
 
     Raises:
         HTTPException: If conversion or publishing fails
     """
+    temp_dir = None
     try:
-        # Convert Markdown
-        converter = MarkdownToConfluence()
-        content = converter.convert(request.markdown)
+        # Create a temporary directory for attachments
+        temp_dir = tempfile.mkdtemp()
+        attachment_paths = {}
+
+        # Save uploaded files to temp directory with their original filenames
+        for attachment in attachments:
+            # Use original filename in temp directory
+            temp_path = PathLib(temp_dir) / attachment.filename
+
+            # Write uploaded content
+            content_bytes = await attachment.read()
+            temp_path.write_bytes(content_bytes)
+
+            # Store mapping of filename to temp path
+            attachment_paths[attachment.filename] = str(temp_path)
+            logger.info(f"Saved attachment: {attachment.filename} to {temp_path}")
+
+        # Convert Markdown with base path for resolving image references
+        if attachment_paths:
+            # Create a virtual base path mapping
+            converter = MarkdownToConfluence()
+            content = converter.convert(request.markdown, extract_images=True)
+            image_refs = converter.get_image_references()
+        else:
+            converter = MarkdownToConfluence()
+            content = converter.convert(request.markdown)
+            image_refs = []
 
         # Initialize Confluence client
         client = ConfluenceClient(
@@ -412,12 +467,55 @@ async def publish_to_confluence(request: PublishRequest) -> PublishResponse:
             parent_id=request.parent_id
         )
 
+        page_id = page["id"]
+        logger.info(f"Page created/updated: {page_id}")
+
+        # Upload attachments
+        uploaded_count = 0
+        failed_count = 0
+
+        # Check if all image references have matching attachments
+        if image_refs:
+            referenced_filenames = {ref['filename'] for ref in image_refs}
+            uploaded_filenames = set(attachment_paths.keys())
+
+            # Warn about missing attachments
+            missing_attachments = referenced_filenames - uploaded_filenames
+            if missing_attachments:
+                logger.warning(
+                    f"Markdown references images that are not in attachments: {missing_attachments}. "
+                    f"These image references will be broken in Confluence."
+                )
+
+            # Info about unreferenced attachments
+            unreferenced_attachments = uploaded_filenames - referenced_filenames
+            if unreferenced_attachments:
+                logger.info(
+                    f"Uploading attachments not referenced in markdown: {unreferenced_attachments}"
+                )
+
+        # Upload all provided attachments
+        for filename, temp_path in attachment_paths.items():
+            try:
+                client.attach_file(
+                    page_id=page_id,
+                    file_path=temp_path,
+                    comment=f"Uploaded via REST API"
+                )
+                logger.info(f"Uploaded attachment: {filename}")
+                uploaded_count += 1
+            except Exception as e:
+                logger.error(f"Failed to upload {filename}: {e}")
+                failed_count += 1
+
         return PublishResponse(
             page_id=page["id"],
             page_url=client.get_page_url(page),
             title=page["title"],
             space=page["space"]["key"],
-            version=page["version"]["number"]
+            version=page["version"]["number"],
+            attachments_uploaded=uploaded_count,
+            attachments_failed=failed_count
         )
 
     except HTTPException:
@@ -428,6 +526,15 @@ async def publish_to_confluence(request: PublishRequest) -> PublishResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Publishing failed: {str(e)}"
         )
+    finally:
+        # Clean up temporary directory and all files
+        if temp_dir:
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                logger.info(f"Cleaned up temporary directory: {temp_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temp directory {temp_dir}: {e}")
 
 
 @app.post("/spaces", response_model=SpacesResponse, status_code=status.HTTP_200_OK)

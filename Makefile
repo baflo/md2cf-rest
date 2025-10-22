@@ -151,10 +151,10 @@ docker-stop:
 	@echo "✅ Containers stopped"
 
 docker-logs:
-	@docker-compose logs -f api || docker logs -f md2cf-api
+	@docker compose logs -f api || docker logs -f md2cf-api
 
 docker-logs-dev:
-	@docker-compose logs -f api-dev
+	@docker compose logs -f api-dev
 
 docker-shell:
 	@docker exec -it md2cf-api /bin/bash || \

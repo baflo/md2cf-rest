@@ -6,8 +6,9 @@ to Confluence Storage Format.
 """
 
 import logging
+import re
 from pathlib import Path
-from typing import Optional, Union
+from typing import Dict, List, Optional, Union
 
 import mistune
 
@@ -15,6 +16,63 @@ from md2cf.renderers.confluence import ConfluenceStorageFormatRenderer
 
 
 logger = logging.getLogger(__name__)
+
+
+class ImageAttributesParser:
+    """
+    Parser for image attributes like {:width 200, :height 100}.
+
+    Stores attributes separately and provides them to the renderer.
+    """
+    def __init__(self):
+        self.attributes = {}  # Maps URL to {width, height}
+
+    def preprocess(self, markdown_text: str) -> str:
+        """
+        Preprocess markdown to extract image attributes and remove metadata.
+
+        Finds patterns like ![alt](url){:width X, :height Y}
+        and stores the attributes separately.
+
+        Also removes metadata lines like:
+        - id:: value
+        - property:: value
+        """
+        # Pattern to match image with attributes
+        pattern = r'!\[([^\]]*)\]\(([^\)]+)\)\s*\{([^}]+)\}'
+
+        def replace_image(match):
+            alt = match.group(1)
+            url = match.group(2).strip()
+            attrs_str = match.group(3)
+
+            # Parse width and height
+            attrs = {}
+            width_match = re.search(r':width\s+["\']?(\d+(?:px)?)["\']?', attrs_str)
+            height_match = re.search(r':height\s+["\']?(\d+(?:px)?)["\']?', attrs_str)
+
+            if width_match:
+                attrs['width'] = width_match.group(1).rstrip('px')
+            if height_match:
+                attrs['height'] = height_match.group(1).rstrip('px')
+
+            # Store attributes using URL as key
+            self.attributes[url] = attrs
+
+            # Return standard markdown image syntax (without attributes)
+            return f'![{alt}]({url})'
+
+        result = re.sub(pattern, replace_image, markdown_text)
+
+        # Remove metadata lines (property:: value format, typically from Logseq/Obsidian)
+        # Matches lines like: id:: value, property:: value, etc.
+        result = re.sub(r'^\s*\w+::\s+[^\n]+$', '', result, flags=re.MULTILINE)
+
+        return result
+
+    def get_attributes(self, url: str) -> dict:
+        """Get stored attributes for a given URL."""
+        return self.attributes.get(url, {})
 
 
 class MarkdownToConfluence:
@@ -25,9 +83,15 @@ class MarkdownToConfluence:
     content into Confluence-compatible XHTML.
     """
 
-    def __init__(self) -> None:
-        """Initialize the converter with Confluence renderer."""
+    def __init__(self, base_path: Optional[Union[str, Path]] = None) -> None:
+        """
+        Initialize the converter with Confluence renderer.
+
+        Args:
+            base_path: Base path for resolving relative image paths (optional)
+        """
         self.renderer = ConfluenceStorageFormatRenderer()
+        self.image_attrs_parser = ImageAttributesParser()
         self.markdown = mistune.create_markdown(
             renderer=self.renderer,
             plugins=[
@@ -37,14 +101,17 @@ class MarkdownToConfluence:
                 "task_lists",
             ],
         )
+        self.base_path = Path(base_path) if base_path else None
+        self.image_references: List[Dict[str, str]] = []
         logger.debug("Initialized MarkdownToConfluence converter")
 
-    def convert(self, markdown_content: str) -> str:
+    def convert(self, markdown_content: str, extract_images: bool = False) -> str:
         """
         Convert Markdown string to Confluence Storage Format.
 
         Args:
             markdown_content: Markdown text to convert
+            extract_images: Whether to extract and track image references
 
         Returns:
             Confluence Storage Format (XHTML) string
@@ -60,15 +127,83 @@ class MarkdownToConfluence:
             logger.warning("Empty markdown content provided")
             return ""
 
+        # Preprocess to extract image attributes
+        preprocessed = self.image_attrs_parser.preprocess(markdown_content)
+
+        # Reset image references before conversion
+        if extract_images:
+            self.image_references.clear()
+            self.renderer.set_converter(self)
+
+        # Pass the parser to renderer so it can access attributes
+        self.renderer.set_image_attrs_parser(self.image_attrs_parser)
+
         logger.debug(f"Converting {len(markdown_content)} characters of Markdown")
-        result = self.markdown(markdown_content)
+        result = self.markdown(preprocessed)
 
         if isinstance(result, str):
             logger.debug(f"Converted to {len(result)} characters of Confluence format")
+            if extract_images and self.image_references:
+                logger.info(f"Extracted {len(self.image_references)} image references")
             return result
         else:
             logger.error(f"Unexpected conversion result type: {type(result)}")
             return str(result)
+
+    def get_image_references(self) -> List[Dict[str, str]]:
+        """
+        Get list of image references found during conversion.
+
+        Returns:
+            List of dictionaries with 'url' and 'resolved_path' keys
+
+        Example:
+            >>> converter = MarkdownToConfluence(base_path="/docs")
+            >>> result = converter.convert("![alt](image.png)", extract_images=True)
+            >>> images = converter.get_image_references()
+            >>> for img in images:
+            ...     print(f"Image: {img['url']} -> {img['resolved_path']}")
+        """
+        return self.image_references.copy()
+
+    def add_image_reference(self, url: str) -> None:
+        """
+        Add an image reference during conversion.
+
+        Args:
+            url: Image URL from markdown
+
+        Note:
+            This method is called internally by the renderer during conversion.
+        """
+        # Skip external URLs (http://, https://, etc.)
+        if url.startswith(('http://', 'https://', '//', 'data:')):
+            logger.debug(f"Skipping external/data URL: {url}")
+            return
+
+        # Resolve relative path if base_path is set
+        resolved_path = None
+        if self.base_path:
+            img_path = self.base_path / url
+            if img_path.exists():
+                resolved_path = str(img_path.resolve())
+                logger.debug(f"Resolved image path: {url} -> {resolved_path}")
+            else:
+                logger.warning(f"Image file not found: {img_path}")
+        else:
+            # Try to resolve relative to current directory
+            img_path = Path(url)
+            if img_path.exists():
+                resolved_path = str(img_path.resolve())
+                logger.debug(f"Resolved image path: {url} -> {resolved_path}")
+            else:
+                logger.warning(f"Image file not found: {url} (no base_path set)")
+
+        self.image_references.append({
+            'url': url,
+            'resolved_path': resolved_path,
+            'filename': Path(url).name
+        })
 
     def convert_file(self, file_path: Union[str, Path]) -> str:
         """

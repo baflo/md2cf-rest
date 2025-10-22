@@ -151,10 +151,90 @@ result = converter.convert("# Hello")
     print()
 
 
-def example_advanced_usage() -> None:
-    """Example 5: Advanced usage with custom processing."""
+def example_publish_with_attachments() -> None:
+    """Example 5: Publish with attachments (requires credentials)."""
     print("=" * 60)
-    print("Example 5: Advanced Usage")
+    print("Example 5: Publish with Attachments")
+    print("=" * 60)
+
+    # Read credentials from environment
+    url = os.getenv("CONFLUENCE_URL")
+    token = os.getenv("CONFLUENCE_TOKEN")
+    space = os.getenv("CONFLUENCE_SPACE", "DEMO")
+
+    if not url or not token:
+        print("Skipping - Set CONFLUENCE_URL and CONFLUENCE_TOKEN environment variables")
+        print()
+        return
+
+    try:
+        # Initialize client
+        client = ConfluenceClient(url=url, token=token, cloud=True)
+
+        # Check if space exists
+        space_info = client.get_space(space)
+        if not space_info:
+            print(f"Space '{space}' not found")
+            return
+
+        # Create converter with base path
+        base_path = Path(__file__).parent
+        converter = MarkdownToConfluence(base_path=base_path)
+
+        # Markdown with image references
+        markdown = """
+# Page with Images
+
+This page demonstrates attachment upload.
+
+## Local Image
+![Diagram](./diagram.png)
+
+## External Image
+![Logo](https://example.com/logo.png)
+"""
+
+        # Convert and extract image references
+        content = converter.convert(markdown, extract_images=True)
+        image_refs = converter.get_image_references()
+
+        # Create or update page
+        page = client.create_or_update_page(
+            space=space,
+            title="md2cf Attachment Test",
+            body=content,
+        )
+
+        page_id = page['id']
+        print(f"Page created/updated: {page_id}")
+
+        # Upload attachments
+        if image_refs:
+            print(f"Found {len(image_refs)} image references")
+            for img_ref in image_refs:
+                if img_ref['resolved_path']:
+                    try:
+                        client.attach_file(
+                            page_id=page_id,
+                            file_path=img_ref['resolved_path'],
+                            comment=f"Uploaded from {img_ref['url']}"
+                        )
+                        print(f"Uploaded: {img_ref['filename']}")
+                    except Exception as e:
+                        print(f"Failed to upload {img_ref['filename']}: {e}")
+
+        print(f"URL: {client.get_page_url(page)}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+    print()
+
+
+def example_advanced_usage() -> None:
+    """Example 6: Advanced usage with custom processing."""
+    print("=" * 60)
+    print("Example 6: Advanced Usage")
     print("=" * 60)
 
     converter = MarkdownToConfluence()
@@ -187,6 +267,7 @@ def main() -> None:
     example_file_conversion()
     example_convert_and_save()
     example_confluence_api()
+    example_publish_with_attachments()
     example_advanced_usage()
 
     print("=" * 60)

@@ -69,16 +69,25 @@ def publish_command(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for failure)
     """
     try:
-        # Convert Markdown to Confluence format
-        converter = MarkdownToConfluence()
-        confluence_content = converter.convert_file(args.input)
+        input_path = Path(args.input)
+
+        # Initialize converter with base path for resolving image paths
+        converter = MarkdownToConfluence(base_path=input_path.parent)
+
+        # Read markdown file
+        with open(input_path, "r", encoding="utf-8") as f:
+            markdown_content = f.read()
+
+        # Convert Markdown to Confluence format and extract image references
+        confluence_content = converter.convert(markdown_content, extract_images=True)
+        image_references = converter.get_image_references()
 
         # Determine page title
         if args.title:
             title = args.title
         else:
             # Use filename without extension as title
-            title = Path(args.input).stem.replace("-", " ").replace("_", " ").title()
+            title = input_path.stem.replace("-", " ").replace("_", " ").title()
 
         # Initialize Confluence client
         client = ConfluenceClient(
@@ -102,10 +111,41 @@ def publish_command(args: argparse.Namespace) -> int:
             parent_id=args.parent_id,
         )
 
+        page_id = page['id']
+        logging.info(f"Page created/updated: {page_id}")
+
+        # Upload attachments
+        if image_references:
+            logging.info(f"Uploading {len(image_references)} attachments...")
+            uploaded_count = 0
+            failed_count = 0
+
+            for img_ref in image_references:
+                if img_ref['resolved_path']:
+                    try:
+                        attachment = client.attach_file(
+                            page_id=page_id,
+                            file_path=img_ref['resolved_path'],
+                            comment=f"Uploaded from {img_ref['url']}"
+                        )
+                        logging.info(f"Uploaded: {img_ref['filename']}")
+                        uploaded_count += 1
+                    except Exception as e:
+                        logging.error(f"Failed to upload {img_ref['filename']}: {e}")
+                        failed_count += 1
+                else:
+                    logging.warning(f"Skipping unresolved image: {img_ref['url']}")
+                    failed_count += 1
+
+            if uploaded_count > 0:
+                print(f"Uploaded {uploaded_count} attachment(s)")
+            if failed_count > 0:
+                print(f"Failed to upload {failed_count} attachment(s)")
+
         # Print success message with URL
         page_url = client.get_page_url(page)
         print(f"Successfully published page: {title}")
-        print(f"Page ID: {page['id']}")
+        print(f"Page ID: {page_id}")
         print(f"URL: {page_url}")
 
         return 0

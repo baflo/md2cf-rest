@@ -23,6 +23,26 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
         """Initialize the Confluence Storage Format renderer."""
         super().__init__(escape=False)
         self._list_depth = 0
+        self._converter = None  # Reference to the converter for tracking images
+        self._image_attrs_parser = None  # Reference to image attributes parser
+
+    def set_converter(self, converter: Any) -> None:
+        """
+        Set the converter instance for image tracking.
+
+        Args:
+            converter: MarkdownToConfluence instance
+        """
+        self._converter = converter
+
+    def set_image_attrs_parser(self, parser: Any) -> None:
+        """
+        Set the image attributes parser.
+
+        Args:
+            parser: ImageAttributesParser instance
+        """
+        self._image_attrs_parser = parser
 
     def heading(self, text: str, level: int, **attrs: Any) -> str:
         """
@@ -190,7 +210,7 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
 
     def image(self, alt: str, url: str, title: Optional[str] = None, **attrs: Any) -> str:
         """
-        Render image.
+        Render image with optional width/height attributes.
 
         Args:
             alt: Alt text
@@ -200,16 +220,58 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
 
         Returns:
             Confluence image macro
-        """
-        # Escape URL but preserve already-encoded entities
-        url = escape(url, quote=False)
 
-        # External image
-        return (
-            f'<ac:image>'
-            f'<ri:url ri:value="{url}" />'
-            f'</ac:image>'
-        )
+        Supports attribute syntax via preprocessor:
+            - ![alt](url){:height 34, :width 123}
+            - ![alt](url){:width "200px"}
+        """
+        # Get width and height from image attributes parser
+        width = None
+        height = None
+        if self._image_attrs_parser:
+            img_attrs = self._image_attrs_parser.get_attributes(url)
+            width = img_attrs.get('width')
+            height = img_attrs.get('height')
+
+        # Track image reference if converter is set
+        if self._converter:
+            self._converter.add_image_reference(url)
+
+        # Escape URL but preserve already-encoded entities
+        url_escaped = escape(url, quote=False)
+
+        # Check if this is a local file that will be uploaded as attachment
+        is_local = not url.startswith(('http://', 'https://', '//', 'data:'))
+
+        # Build image attributes and parameters
+        # Confluence supports both ac:width/ac:height attributes and ac:parameter elements
+        image_attrs = []
+        if width:
+            image_attrs.append(f'ac:width="{escape(str(width), quote=False)}"')
+        if height:
+            image_attrs.append(f'ac:height="{escape(str(height), quote=False)}"')
+
+        attrs_str = ' ' + ' '.join(image_attrs) if image_attrs else ''
+
+        if is_local:
+            # For local files, use attachment reference
+            # Extract filename from path
+            from pathlib import Path
+            filename = Path(url).name
+            filename_escaped = escape(filename, quote=False)
+
+            return (
+                f'<ac:image{attrs_str}>'
+                f'<ri:attachment ri:filename="{filename_escaped}" />'
+                f'</ac:image>'
+            )
+        else:
+            # For external URLs, use URL reference
+            return (
+                f'<ac:image{attrs_str}>'
+                f'<ri:url ri:value="{url_escaped}" />'
+                f'</ac:image>'
+            )
 
     def table(self, text: str, **attrs: Any) -> str:
         """

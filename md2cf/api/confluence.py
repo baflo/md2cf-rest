@@ -297,10 +297,6 @@ class ConfluenceClient:
         """
         base_url = page.get("_links", {}).get("base", self.url) + "/"
         web_ui = "./" + page.get("_links", {}).get("webui", "")
-        print("base_url:", base_url)
-        print("web_ui:", web_ui)
-        print("join", urljoin(base_url, web_ui))
-        print(page)
         return urljoin(base_url, web_ui)
 
     def delete_page(self, page_id: str) -> None:
@@ -443,4 +439,104 @@ class ConfluenceClient:
 
         except Exception as e:
             logger.error(f"Error searching pages: {e}")
+            raise
+
+    def attach_file(
+        self,
+        page_id: str,
+        file_path: str,
+        comment: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Attach a file to a Confluence page.
+
+        Args:
+            page_id: Page ID to attach file to
+            file_path: Path to the file to attach
+            comment: Optional comment for the attachment
+
+        Returns:
+            Attachment data dictionary
+
+        Example:
+            >>> attachment = client.attach_file(
+            ...     page_id="123456",
+            ...     file_path="/path/to/image.png",
+            ...     comment="Updated diagram"
+            ... )
+            >>> print(f"Attached: {attachment['title']}")
+        """
+        try:
+            from pathlib import Path
+            path = Path(file_path)
+
+            if not path.exists():
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            filename = path.name
+
+            result = self.confluence.attach_file(
+                filename=str(path),
+                page_id=page_id,
+                comment=comment,
+            )
+
+            logger.info(f"Attached file '{filename}' to page {page_id}")
+            return result
+        except Exception as e:
+            logger.error(f"Error attaching file {file_path} to page {page_id}: {e}")
+            raise
+
+    def get_attachments(
+        self,
+        page_id: str,
+    ) -> list[Dict[str, Any]]:
+        """
+        Get all attachments for a page.
+
+        Args:
+            page_id: Page ID
+
+        Returns:
+            List of attachment data dictionaries
+
+        Example:
+            >>> attachments = client.get_attachments("123456")
+            >>> for att in attachments:
+            ...     print(f"{att['title']} - {att['id']}")
+        """
+        try:
+            result = self.confluence.get_attachments_from_content(
+                page_id=page_id,
+            )
+            attachments = result.get("results", [])
+            logger.info(f"Found {len(attachments)} attachments for page {page_id}")
+            return attachments
+        except Exception as e:
+            logger.error(f"Error getting attachments for page {page_id}: {e}")
+            raise
+
+    def delete_attachment(
+        self,
+        page_id: str,
+        attachment_id: str,
+    ) -> None:
+        """
+        Delete an attachment from a page.
+
+        Args:
+            page_id: Page ID
+            attachment_id: Attachment ID to delete
+
+        Example:
+            >>> client.delete_attachment("123456", "att_789")
+        """
+        try:
+            self.confluence.delete_attachment(
+                page_id=page_id,
+                attachment_id=attachment_id,
+            )
+            logger.info(f"Deleted attachment {attachment_id} from page {page_id}")
+        except Exception as e:
+            logger.error(f"Error deleting attachment {attachment_id}: {e}")
             raise

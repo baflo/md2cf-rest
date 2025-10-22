@@ -82,3 +82,6 @@ Thumbs.db
 # Secrets
 rootfs/usr/local/share/ca-certificates/*
 !rootfs/usr/local/share/ca-certificates/.keep
+
+# Generated
+md2cf-api

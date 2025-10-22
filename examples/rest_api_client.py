@@ -57,9 +57,10 @@ class Md2cfClient:
         space: str,
         title: str,
         parent_id: Optional[str] = None,
-        cloud: bool = True
+        cloud: bool = True,
+        attachments: Optional[list] = None
     ) -> dict:
-        """Convert and publish Markdown to Confluence.
+        """Convert and publish Markdown to Confluence with optional attachments.
 
         Args:
             markdown: Markdown content
@@ -69,24 +70,46 @@ class Md2cfClient:
             title: Page title
             parent_id: Optional parent page ID
             cloud: Whether this is Confluence Cloud (vs Server)
+            attachments: Optional list of file paths to upload as attachments
 
         Returns:
-            Published page information
+            Published page information including attachment upload status
         """
-        response = self.session.post(
-            f"{self.api_url}/publish",
-            json={
-                "markdown": markdown,
-                "confluence_url": confluence_url,
-                "token": token,
-                "space": space,
-                "title": title,
-                "parent_id": parent_id,
-                "cloud": cloud
-            }
-        )
-        response.raise_for_status()
-        return response.json()
+        # Prepare form data
+        data = {
+            "markdown": markdown,
+            "confluence_url": confluence_url,
+            "token": token,
+            "space": space,
+            "title": title,
+            "cloud": str(cloud).lower()
+        }
+
+        if parent_id:
+            data["parent_id"] = parent_id
+
+        # Prepare files for upload (if any)
+        files = []
+        file_handles = []
+
+        if attachments:
+            for file_path in attachments:
+                f = open(file_path, "rb")
+                file_handles.append(f)
+                files.append(("attachments", (os.path.basename(file_path), f)))
+
+        try:
+            response = self.session.post(
+                f"{self.api_url}/publish",
+                data=data,
+                files=files if files else None
+            )
+            response.raise_for_status()
+            return response.json()
+        finally:
+            # Close all file handles
+            for f in file_handles:
+                f.close()
 
 
 def example_health_check():
@@ -241,6 +264,86 @@ print(result)
     print()
 
 
+def example_publish_with_attachments():
+    """Example 5: Publish to Confluence with attachments."""
+    print("=" * 60)
+    print("Example 5: Publish with Attachments")
+    print("=" * 60)
+
+    # Read credentials from environment
+    confluence_url = os.getenv("CONFLUENCE_URL")
+    token = os.getenv("CONFLUENCE_TOKEN")
+    space = os.getenv("CONFLUENCE_SPACE", "DEMO")
+
+    if not confluence_url or not token:
+        print("Skipping - Set CONFLUENCE_URL and CONFLUENCE_TOKEN environment variables")
+        print()
+        return
+
+    client = Md2cfClient()
+
+    markdown = """
+# Page with Attachments
+
+This page demonstrates uploading attachments via REST API.
+
+## Local Image
+
+![Diagram](diagram.png)
+
+## Documentation
+
+See the attached document for more details.
+
+## External Image (not uploaded)
+
+![Logo](https://example.com/logo.png)
+"""
+
+    # Example attachment files (adjust paths as needed)
+    attachments = []
+    example_files = [
+        os.path.join(os.path.dirname(__file__), "diagram.png"),
+        os.path.join(os.path.dirname(__file__), "document.pdf"),
+    ]
+
+    # Only include files that exist
+    for file_path in example_files:
+        if os.path.exists(file_path):
+            attachments.append(file_path)
+
+    if not attachments:
+        print("No attachment files found. Create some example files to test:")
+        print("  - diagram.png")
+        print("  - document.pdf")
+        print()
+        return
+
+    try:
+        result = client.publish(
+            markdown=markdown,
+            confluence_url=confluence_url,
+            token=token,
+            space=space,
+            title="REST API Attachment Test",
+            cloud=True,
+            attachments=attachments
+        )
+
+        print("Page published successfully with attachments!")
+        print(f"Page ID: {result['page_id']}")
+        print(f"Title: {result['title']}")
+        print(f"Space: {result['space']}")
+        print(f"Version: {result['version']}")
+        print(f"Attachments uploaded: {result['attachments_uploaded']}")
+        print(f"Attachments failed: {result['attachments_failed']}")
+        print(f"URL: {result['page_url']}")
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+    print()
+
+
 def main():
     """Run all examples."""
     print("\n" + "=" * 60)
@@ -251,6 +354,7 @@ def main():
     example_convert()
     example_convert_file()
     example_publish()
+    example_publish_with_attachments()
 
     print("=" * 60)
     print("Examples completed!")
