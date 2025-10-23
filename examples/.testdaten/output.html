@@ -1,0 +1,294 @@
+<h1>Sample Documentation</h1>
+<p>This is a comprehensive example demonstrating all supported Markdown features that can be converted to Confluence Storage Format.</p>
+<h2>Introduction</h2>
+<p>Welcome to the <strong>md2cf</strong> documentation. This tool allows you to convert Markdown files to Confluence pages seamlessly.</p>
+<h2>Text Formatting</h2>
+<p>You can use various text formatting options:</p>
+<ul>
+<li><p><strong>Bold text</strong> using double asterisks</p>
+</li>
+<li><p><em>Italic text</em> using single asterisks</p>
+</li>
+<li><p><del>Strikethrough text</del> using double tildes</p>
+</li>
+<li><p><code>Inline code</code> using backticks</p>
+</li>
+</ul>
+<p>Combined formatting: <strong>bold with <em>nested italic</em> text</strong> and <em>italic with <strong>nested bold</strong> text</em>.</p>
+<h2>Headings</h2>
+<p>This document demonstrates all heading levels:</p>
+<h3>Level 3 Heading</h3>
+<p>Regular content under level 3.</p>
+<h4>Level 4 Heading</h4>
+<p>Regular content under level 4.</p>
+<h5>Level 5 Heading</h5>
+<p>Regular content under level 5.</p>
+<h6>Level 6 Heading</h6>
+<p>Regular content under level 6.</p>
+<h2>Lists</h2>
+<h3>Unordered Lists</h3>
+<p>Funktioniert nicht auf oberster Ebene.</p>
+<p>Aber darunter bleiben die Listen erhalten:</p>
+<ul>
+<li><p>First item</p>
+</li>
+<li><p>Second item</p>
+<ul>
+<li><p>Nested item 1</p>
+</li>
+<li><p>Nested item 2</p>
+</li>
+</ul>
+</li>
+<li><p>Third item</p>
+</li>
+</ul>
+<h3>Ordered Lists</h3>
+<ol>
+<li><p>First step</p>
+</li>
+<li><p>Second step</p>
+<ol>
+<li><p>Substep 2.1</p>
+</li>
+<li><p>Substep 2.2</p>
+</li>
+</ol>
+</li>
+<li><p>Third step</p>
+</li>
+</ol>
+<h3>Mixed Lists</h3>
+<ol>
+<li><p>Ordered item</p>
+<ul>
+<li><p>Unordered nested item</p>
+</li>
+<li><p>Another unordered item</p>
+</li>
+</ul>
+</li>
+<li><p>Another ordered item</p>
+</li>
+</ol>
+<h2>Code Examples</h2>
+<h3>Inline Code</h3>
+<p>Use the <code>print()</code> function to display output in Python.</p>
+<h3>Code Blocks</h3>
+<p>Here's a Python example:</p>
+<ul>
+<li><ac:structured-macro ac:name="code" ac:schema-version="1"><ac:parameter ac:name="language">python</ac:parameter><ac:plain-text-body><![CDATA[def fibonacci(n):
+"""Calculate the nth Fibonacci number."""
+if n <= 1:
+return n
+return fibonacci(n - 1) + fibonacci(n - 2)
+
+# Calculate first 10 Fibonacci numbers
+for i in range(10):
+print(f"F({i}) = {fibonacci(i)}")]]></ac:plain-text-body></ac:structured-macro>
+</li>
+</ul>
+<p>JavaScript example:</p>
+<ul>
+<li><ac:structured-macro ac:name="code" ac:schema-version="1"><ac:parameter ac:name="language">javascript</ac:parameter><ac:plain-text-body><![CDATA[const greet = (name) => {
+console.log(`Hello, ${name}!`);
+};
+
+greet('World');]]></ac:plain-text-body></ac:structured-macro>
+</li>
+</ul>
+<p>Shell script:</p>
+<ul>
+<li><ac:structured-macro ac:name="code" ac:schema-version="1"><ac:parameter ac:name="language">bash</ac:parameter><ac:plain-text-body><![CDATA[#!/bin/bash
+for file in *.md; do
+md2cf convert "$file" -o "${file%.md}.html"
+done]]></ac:plain-text-body></ac:structured-macro>
+</li>
+</ul>
+<p>Plain text code block:</p>
+<ul>
+<li><ac:structured-macro ac:name="code" ac:schema-version="1"><ac:parameter ac:name="language">none</ac:parameter><ac:plain-text-body><![CDATA[This is a plain text code block
+without syntax highlighting.]]></ac:plain-text-body></ac:structured-macro>
+</li>
+</ul>
+<h2>Links</h2>
+<p>Here are various types of links:</p>
+<ul>
+<li><p><a href="https://www.example.com">Simple link</a></p>
+</li>
+<li><p><a href="https://www.example.com" title="Example Website">Link with title</a></p>
+</li>
+<li><p>External link: <a href="https://github.com">https://github.com</a></p>
+</li>
+</ul>
+<h2>Images</h2>
+<p><ac:image ac:width="123"><ri:attachment ri:filename="image_1761113683283_0.png" /></ac:image></p>
+<p><ac:image ac:width="200"><ri:attachment ri:filename="image_1761113803237_0.png" /></ac:image></p>
+<h2>Diagrams</h2>
+<ac:structured-macro ac:name="code" ac:schema-version="1"><ac:parameter ac:name="language">plantuml</ac:parameter><ac:plain-text-body><![CDATA[@startuml
+class Car
+
+Driver - Car : drives >
+Car *- Wheel : has 4 >
+Car -- Person : < owns
+
+@enduml]]></ac:plain-text-body></ac:structured-macro>
+<h2>Tables</h2>
+<h3>Simple Table</h3>
+<table>
+<thead>
+<th>Feature</th>
+<th>Supported</th>
+<th>Notes</th>
+</thead>
+<tbody>
+<tr>
+<td>Headings</td>
+<td>Yes</td>
+<td>All levels (H1-H6)</td>
+</tr>
+<tr>
+<td>Lists</td>
+<td>Yes</td>
+<td>Ordered and unordered</td>
+</tr>
+<tr>
+<td>Code</td>
+<td>Yes</td>
+<td>Inline and blocks</td>
+</tr>
+<tr>
+<td>Tables</td>
+<td>Yes</td>
+<td>With alignment</td>
+</tr>
+</tbody>
+</table>
+<h3>Table with Alignment</h3>
+<table>
+<thead>
+<th style="text-align: left;">Left Aligned</th>
+<th style="text-align: center;">Center Aligned</th>
+<th style="text-align: right;">Right Aligned</th>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Item 1</td>
+<td style="text-align: center;">Item 2</td>
+<td style="text-align: right;">Item 3</td>
+</tr>
+<tr>
+<td style="text-align: left;">Value A</td>
+<td style="text-align: center;">Value B</td>
+<td style="text-align: right;">Value C</td>
+</tr>
+<tr>
+<td style="text-align: left;">Data X</td>
+<td style="text-align: center;">Data Y</td>
+<td style="text-align: right;">Data Z</td>
+</tr>
+</tbody>
+</table>
+<h3>Complex Table</h3>
+<table>
+<thead>
+<th>Component</th>
+<th>Description</th>
+<th>Status</th>
+<th>Priority</th>
+</thead>
+<tbody>
+<tr>
+<td>Renderer</td>
+<td>Converts MD to Confluence format</td>
+<td>✅ Complete</td>
+<td>High</td>
+</tr>
+<tr>
+<td>API Client</td>
+<td>Handles Confluence REST API</td>
+<td>✅ Complete</td>
+<td>High</td>
+</tr>
+<tr>
+<td>CLI</td>
+<td>Command-line interface</td>
+<td>✅ Complete</td>
+<td>Medium</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>Unit and integration tests</td>
+<td>✅ Complete</td>
+<td>High</td>
+</tr>
+</tbody>
+</table>
+<h2>Blockquotes</h2>
+<blockquote><p>This is a blockquote.
+It can span multiple lines.</p>
+</blockquote>
+<blockquote><p><strong>Important Note:</strong>
+You can include formatting inside blockquotes.</p>
+</blockquote>
+<p>Nested blockquotes:</p>
+<blockquote><p>This is the outer quote.</p>
+<blockquote><p>This is nested inside.</p>
+</blockquote>
+</blockquote>
+<h2>Horizontal Rules</h2>
+<p>Content above the line.</p>
+<hr/>
+<p>Content below the line.</p>
+<h2>Advanced Features</h2>
+<h3>Task Lists</h3>
+<ac:task-list>
+<ac:task><ac:task-id>1</ac:task-id><ac:task-status>complete</ac:task-status><ac:task-body><span class="placeholder-inline-tasks">Implement Mistune renderer</span></ac:task-body></ac:task>
+<ac:task><ac:task-id>2</ac:task-id><ac:task-status>complete</ac:task-status><ac:task-body><span class="placeholder-inline-tasks">Create Confluence API client</span></ac:task-body></ac:task>
+<ac:task><ac:task-id>3</ac:task-id><ac:task-status>complete</ac:task-status><ac:task-body><span class="placeholder-inline-tasks">Build CLI interface</span></ac:task-body></ac:task>
+<ac:task><ac:task-id>4</ac:task-id><ac:task-status>incomplete</ac:task-status><ac:task-body><span class="placeholder-inline-tasks">Write comprehensive tests</span></ac:task-body></ac:task>
+<ac:task><ac:task-id>5</ac:task-id><ac:task-status>incomplete</ac:task-status><ac:task-body><span class="placeholder-inline-tasks">Add more examples</span></ac:task-body></ac:task>
+</ac:task-list>
+<h3>Zweite Task Liste</h3>
+<ac:task-list>
+<ac:task><ac:task-id>6</ac:task-id><ac:task-status>incomplete</ac:task-status><ac:task-body><span class="placeholder-inline-tasks">Noch zu tun</span></ac:task-body></ac:task>
+<ac:task><ac:task-id>7</ac:task-id><ac:task-status>complete</ac:task-status><ac:task-body><span class="placeholder-inline-tasks">ist schon erledigt</span></ac:task-body></ac:task>
+</ac:task-list>
+<h3>Mixed Content</h3>
+<p>You can combine different elements:</p>
+<ol>
+<li><p><strong>Code example</strong> with explanation:</p>
+<ac:structured-macro ac:name="code" ac:schema-version="1"><ac:parameter ac:name="language">python</ac:parameter><ac:plain-text-body><![CDATA[result = [x * 2 for x in range(10)]
+print(result)]]></ac:plain-text-body></ac:structured-macro>
+</li>
+<li><p><strong>Table</strong> showing results:
+| Input | Output |
+|-------|--------|
+| 0     | 0      |
+| 1     | 2      |
+| 2     | 4      |</p>
+</li>
+<li><p><strong>Quote</strong> from documentation:</p>
+<blockquote><p>Always validate your input data before processing.</p>
+</blockquote>
+</li>
+</ol>
+<h2>Best Practices</h2>
+<p>When converting Markdown to Confluence:</p>
+<ul>
+<li><p>Use descriptive headings for better navigation</p>
+</li>
+<li><p>Include code blocks with language specification for syntax highlighting</p>
+</li>
+<li><p>Keep tables simple and readable</p>
+</li>
+<li><p>Use lists to break down complex information</p>
+</li>
+<li><p>Add images with descriptive alt text</p>
+</li>
+</ul>
+<h2>Conclusion</h2>
+<p>This example demonstrates all major Markdown features supported by <strong>md2cf</strong>. Use this as a template for your own documentation.</p>
+<p>For more information, visit the <a href="https://github.com/yourusername/md2cf">project repository</a>.</p>
+<hr/>
+<p><em>Last updated: 2025</em></p>

@@ -70,6 +70,8 @@ class PublishResponse(BaseModel):
     title: str = Field(..., description="Page title")
     space: str = Field(..., description="Space key")
     version: int = Field(..., description="Page version number")
+    last_modified: Optional[str] = Field(None, description="Last modification timestamp (ISO 8601 format)")
+    modified_by: Optional[str] = Field(None, description="User who last modified the page")
     attachments_uploaded: int = Field(0, description="Number of attachments uploaded")
     attachments_failed: int = Field(0, description="Number of attachments that failed to upload")
 
@@ -81,6 +83,8 @@ class PublishResponse(BaseModel):
                 "title": "My Page",
                 "space": "DEMO",
                 "version": 1,
+                "last_modified": "2025-01-23T12:34:56.789Z",
+                "modified_by": "john.doe@example.com",
                 "attachments_uploaded": 2,
                 "attachments_failed": 0
             }
@@ -409,7 +413,8 @@ async def publish_to_confluence(
         attachments: Optional list of attachment files to upload (default: empty list)
 
     Returns:
-        PublishResponse with the created/updated page information and attachment status
+        PublishResponse with the created/updated page information, version metadata,
+        timestamp of last modification, user who modified the page, and attachment status
 
     Raises:
         HTTPException: If conversion or publishing fails
@@ -444,6 +449,12 @@ async def publish_to_confluence(
             content = converter.convert(request.markdown)
             image_refs = []
 
+        with open("/app/examples/.testdaten/input.md", "w") as f:
+            f.write(request.markdown)
+
+        with open("/app/examples/.testdaten/output.html", "w") as f:
+            f.write(content)
+
         # Initialize Confluence client
         client = ConfluenceClient(
             url=request.confluence_url,
@@ -469,6 +480,10 @@ async def publish_to_confluence(
 
         page_id = page["id"]
         logger.info(f"Page created/updated: {page_id}")
+
+        # Fetch the page again with full version details to ensure we have all metadata
+        # The create/update response might not include all version.by details
+        page = client.get_page_by_id(page_id, expand="version,space")
 
         # Upload attachments
         uploaded_count = 0
@@ -508,12 +523,20 @@ async def publish_to_confluence(
                 logger.error(f"Failed to upload {filename}: {e}")
                 failed_count += 1
 
+        # Extract version information
+        version_info = page.get("version", {})
+        last_modified = version_info.get("when")  # ISO 8601 timestamp
+        modified_by_data = version_info.get("by", {})
+        modified_by = modified_by_data.get("email") or modified_by_data.get("displayName") or modified_by_data.get("username")
+
         return PublishResponse(
             page_id=page["id"],
             page_url=client.get_page_url(page),
             title=page["title"],
             space=page["space"]["key"],
             version=page["version"]["number"],
+            last_modified=last_modified,
+            modified_by=modified_by,
             attachments_uploaded=uploaded_count,
             attachments_failed=failed_count
         )

@@ -25,6 +25,8 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
         self._list_depth = 0
         self._converter = None  # Reference to the converter for tracking images
         self._image_attrs_parser = None  # Reference to image attributes parser
+        self._in_task_list = False  # Track if we're in a task list
+        self._task_counter = 0  # Counter for generating unique task IDs
 
     def set_converter(self, converter: Any) -> None:
         """
@@ -117,10 +119,18 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
             **attrs: Additional attributes
 
         Returns:
-            Confluence list markup
+            Confluence list markup or task list
         """
-        tag = "ol" if ordered else "ul"
-        return f"<{tag}>\n{text}</{tag}>\n"
+        # Check if this is a task list by looking for <ac:task> elements
+        is_task_list = '<ac:task>' in text
+
+        if is_task_list:
+            # Wrap task items in ac:task-list
+            return f"<ac:task-list>\n{text}</ac:task-list>\n"
+        else:
+            # Regular list
+            tag = "ol" if ordered else "ul"
+            return f"<{tag}>\n{text}</{tag}>\n"
 
     def list_item(self, text: str, **attrs: Any) -> str:
         """
@@ -371,7 +381,7 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
 
     def task_list_item(self, text: str, checked: bool = False, **attrs: Any) -> str:
         """
-        Render task list item with checkbox.
+        Render task list item as Confluence Action Item.
 
         Args:
             text: The item content
@@ -379,12 +389,43 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
             **attrs: Additional attributes
 
         Returns:
-            Confluence task list item markup (using valid XHTML)
+            Confluence Action Item macro
         """
-        # Use proper XHTML boolean attribute syntax (checked="checked" instead of just checked)
-        checkbox_attr = 'checked="checked" ' if checked else ''
-        checkbox = f'<input class="task-list-item-checkbox" type="checkbox" disabled="disabled" {checkbox_attr}/>'
-        return f'<li class="task-list-item">{checkbox}{text}</li>\n'
+        # Generate unique task ID
+        self._task_counter += 1
+        task_id = self._task_counter
+
+        # Use Confluence's task macro for proper action items
+        # ac:task-status: "complete" for checked items, "incomplete" for unchecked
+        status = "complete" if checked else "incomplete"
+
+        # Strip surrounding <p> tags if present, as task bodies should be inline
+        # If there are multiple paragraphs, keep them but strip the outer ones
+        task_text = text.strip()
+
+        # Remove single outer paragraph tags for simple cases
+        if task_text.startswith('<p>') and task_text.endswith('</p>\n'):
+            # Check if this is a single paragraph (no other </p> in between)
+            inner_content = task_text[3:-5]
+            if '</p>' not in inner_content:
+                task_text = inner_content
+            else:
+                # Multiple paragraphs - remove only the outer wrapper
+                task_text = task_text[3:-5]
+        elif task_text.startswith('<p>') and task_text.endswith('</p>'):
+            inner_content = task_text[3:-4]
+            if '</p>' not in inner_content:
+                task_text = inner_content
+            else:
+                task_text = task_text[3:-4]
+
+        return (
+            f'<ac:task>'
+            f'<ac:task-id>{task_id}</ac:task-id>'
+            f'<ac:task-status>{status}</ac:task-status>'
+            f'<ac:task-body><span class="placeholder-inline-tasks">{task_text}</span></ac:task-body>'
+            f'</ac:task>\n'
+        )
 
     def text(self, text: str, **attrs: Any) -> str:
         """

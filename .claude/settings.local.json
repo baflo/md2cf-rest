@@ -12,7 +12,8 @@
       "Bash(docker run:*)",
       "Bash(curl:*)",
       "Bash(docker stop:*)",
-      "Bash(docker rmi:*)"
+      "Bash(docker rmi:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

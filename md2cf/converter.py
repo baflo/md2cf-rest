@@ -68,6 +68,13 @@ class ImageAttributesParser:
         # Matches lines like: id:: value, property:: value, etc.
         result = re.sub(r'^\s*\w+::\s+[^\n]+$', '', result, flags=re.MULTILINE)
 
+        # Remove LOGBOOK blocks (from Logseq/Org-mode)
+        # Matches blocks like:
+        # :LOGBOOK:
+        # CLOCK: [timestamp]
+        # :END:
+        result = re.sub(r'^\s*:LOGBOOK:.*?:END:\s*$', '', result, flags=re.MULTILINE | re.DOTALL)
+
         return result
 
     def get_attributes(self, url: str) -> dict:

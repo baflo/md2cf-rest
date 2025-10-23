@@ -19,13 +19,15 @@ services:
       retries: 3
       start_period: 5s
     restart: unless-stopped
+    profiles:
+      - production
 
   # Development API server with hot-reload
   api-dev:
     build:
       context: .
-      dockerfile: Dockerfile.dev
-    image: md2cf-rest:dev
+      dockerfile: Dockerfile
+    image: md2cf-rest:latest
     container_name: md2cf-api-dev
     ports:
       - "8000:8000"
@@ -37,7 +39,7 @@ services:
     environment:
       - LOG_LEVEL=debug
       - PYTHONUNBUFFERED=1
-    command: uvicorn md2cf.rest_api:app --host 0.0.0.0 --port 8000 --reload
+    # command: uvicorn md2cf.rest_api:app --host 0.0.0.0 --port 8000 --reload
     profiles:
       - dev
 
@@ -45,16 +47,16 @@ services:
   watcher:
     build:
       context: .
-      dockerfile: Dockerfile.dev
-    image: md2cf-rest:dev
+      dockerfile: Dockerfile
+    image: md2cf-rest:latest
     container_name: md2cf-watcher
     volumes:
       - ./md2cf:/app/md2cf
       - ./scripts:/app/scripts
       - ./:/app/output
     command: python scripts/watch-and-export.py
-    profiles:
-      - dev
+    # profiles:
+    #   - dev
 
   # Nginx reverse proxy (optional)
   nginx:

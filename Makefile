@@ -160,6 +160,10 @@ docker-shell:
 	@docker exec -it md2cf-api /bin/bash || \
 		docker run --rm -it md2cf-rest:latest /bin/bash
 
+docker-shell-dev:
+	@docker exec -it md2cf-api-dev /bin/bash || \
+		docker run --rm -it md2cf-rest:latest /bin/bash
+
 docker-clean:
 	@echo "Cleaning up Docker resources..."
 	docker compose down -v
