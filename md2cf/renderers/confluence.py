@@ -77,21 +77,33 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
         """
         Render code block.
 
+        Special handling for PlantUML: renders as PlantUML macro instead of code macro.
+
         Args:
             code: The code content
             info: Language identifier (optional)
             **attrs: Additional attributes
 
         Returns:
-            Confluence code macro
+            Confluence code macro or PlantUML macro
         """
         # Don't escape code in CDATA sections - they're already protected
         code = code.rstrip()
-        language = escape(info.strip()) if info else "none"
+        language = info.strip().lower() if info else "none"
 
+        # Special handling for PlantUML (supports plantuml, puml, and plant-uml)
+        if language in ("plantuml", "puml", "plant-uml"):
+            return (
+                f'<ac:structured-macro ac:name="plantuml" ac:schema-version="1">'
+                f'<ac:plain-text-body><![CDATA[{code}]]></ac:plain-text-body>'
+                f'</ac:structured-macro>\n'
+            )
+
+        # Regular code block
+        language_escaped = escape(language)
         return (
             f'<ac:structured-macro ac:name="code" ac:schema-version="1">'
-            f'<ac:parameter ac:name="language">{language}</ac:parameter>'
+            f'<ac:parameter ac:name="language">{language_escaped}</ac:parameter>'
             f'<ac:plain-text-body><![CDATA[{code}]]></ac:plain-text-body>'
             f'</ac:structured-macro>\n'
         )
