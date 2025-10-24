@@ -90,15 +90,22 @@ class MarkdownToConfluence:
     content into Confluence-compatible XHTML.
     """
 
-    def __init__(self, base_path: Optional[Union[str, Path]] = None) -> None:
+    def __init__(
+        self,
+        base_path: Optional[Union[str, Path]] = None,
+        jira_url: Optional[str] = None
+    ) -> None:
         """
         Initialize the converter with Confluence renderer.
 
         Args:
             base_path: Base path for resolving relative image paths (optional)
+            jira_url: Base Jira URL for detecting Jira ticket links (optional)
+                     e.g., "https://jira.lvm.de/jira/"
         """
         self.renderer = ConfluenceStorageFormatRenderer()
         self.image_attrs_parser = ImageAttributesParser()
+        self.jira_url = jira_url.rstrip('/') if jira_url else None
         self.markdown = mistune.create_markdown(
             renderer=self.renderer,
             plugins=[
@@ -111,6 +118,8 @@ class MarkdownToConfluence:
         self.base_path = Path(base_path) if base_path else None
         self.image_references: List[Dict[str, str]] = []
         logger.debug("Initialized MarkdownToConfluence converter")
+        if self.jira_url:
+            logger.debug(f"Jira URL configured: {self.jira_url}")
 
     def convert(self, markdown_content: str, extract_images: bool = False) -> str:
         """
@@ -144,6 +153,9 @@ class MarkdownToConfluence:
 
         # Pass the parser to renderer so it can access attributes
         self.renderer.set_image_attrs_parser(self.image_attrs_parser)
+
+        # Pass jira_url to renderer for Jira link detection
+        self.renderer.set_jira_url(self.jira_url)
 
         logger.debug(f"Converting {len(markdown_content)} characters of Markdown")
         result = self.markdown(preprocessed)

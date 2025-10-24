@@ -60,6 +60,7 @@ class PublishRequest(BaseModel):
     title: str = Field(..., description="Page title")
     parent_id: Optional[str] = Field(None, description="Parent page ID (optional)")
     cloud: bool = Field(True, description="Whether this is Confluence Cloud (vs Server)")
+    jira_url: Optional[str] = Field(None, description="Base Jira URL for converting Jira ticket links to macros (e.g., 'https://jira.lvm.de/jira')")
 
 
 class PublishResponse(BaseModel):
@@ -375,6 +376,7 @@ def publish_request_form(
     title: str = Form(..., description="Page title"),
     parent_id: Optional[str] = Form(None, description="Parent page ID (optional)"),
     cloud: bool = Form(True, description="Whether this is Confluence Cloud (vs Server)"),
+    jira_url: Optional[str] = Form(None, description="Base Jira URL for converting Jira ticket links to macros"),
 ) -> PublishRequest:
     """Helper function to create PublishRequest from form data."""
     return PublishRequest(
@@ -384,7 +386,8 @@ def publish_request_form(
         space=space,
         title=title,
         parent_id=parent_id,
-        cloud=cloud
+        cloud=cloud,
+        jira_url=jira_url
     )
 
 
@@ -441,11 +444,11 @@ async def publish_to_confluence(
         # Convert Markdown with base path for resolving image references
         if attachment_paths:
             # Create a virtual base path mapping
-            converter = MarkdownToConfluence()
+            converter = MarkdownToConfluence(jira_url=request.jira_url)
             content = converter.convert(request.markdown, extract_images=True)
             image_refs = converter.get_image_references()
         else:
-            converter = MarkdownToConfluence()
+            converter = MarkdownToConfluence(jira_url=request.jira_url)
             content = converter.convert(request.markdown)
             image_refs = []
 

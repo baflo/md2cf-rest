@@ -71,8 +71,12 @@ def publish_command(args: argparse.Namespace) -> int:
     try:
         input_path = Path(args.input)
 
-        # Initialize converter with base path for resolving image paths
-        converter = MarkdownToConfluence(base_path=input_path.parent)
+        # Initialize converter with base path for resolving image paths and optional jira_url
+        jira_url = getattr(args, 'jira_url', None)
+        converter = MarkdownToConfluence(
+            base_path=input_path.parent,
+            jira_url=jira_url
+        )
 
         # Read markdown file
         with open(input_path, "r", encoding="utf-8") as f:
@@ -267,6 +271,11 @@ Environment Variables:
         "--no-verify-ssl",
         action="store_true",
         help="Disable SSL certificate verification",
+    )
+    publish_parser.add_argument(
+        "--jira-url",
+        type=str,
+        help="Base Jira URL for converting Jira ticket links to macros (e.g., https://jira.lvm.de/jira)",
     )
 
     return parser

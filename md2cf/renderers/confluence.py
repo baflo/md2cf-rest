@@ -27,6 +27,7 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
         self._image_attrs_parser = None  # Reference to image attributes parser
         self._in_task_list = False  # Track if we're in a task list
         self._task_counter = 0  # Counter for generating unique task IDs
+        self._jira_url = None  # Base Jira URL for detecting ticket links
 
     def set_converter(self, converter: Any) -> None:
         """
@@ -45,6 +46,15 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
             parser: ImageAttributesParser instance
         """
         self._image_attrs_parser = parser
+
+    def set_jira_url(self, jira_url: Optional[str]) -> None:
+        """
+        Set the base Jira URL for detecting Jira ticket links.
+
+        Args:
+            jira_url: Base Jira URL (e.g., "https://jira.lvm.de/jira")
+        """
+        self._jira_url = jira_url
 
     def heading(self, text: str, level: int, **attrs: Any) -> str:
         """
@@ -214,6 +224,9 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
         """
         Render hyperlink.
 
+        If the URL is a Jira ticket link (matches configured jira_url), it will be
+        converted to a Jira macro instead of a regular link.
+
         Args:
             text: The link text
             url: The URL
@@ -221,14 +234,55 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
             **attrs: Additional attributes
 
         Returns:
-            Confluence link markup
+            Confluence link markup or Jira macro
         """
+        # Check if this is a Jira ticket link
+        if self._jira_url and url.startswith(self._jira_url):
+            # Extract ticket key from URL
+            # Expected format: https://jira.lvm.de/jira/browse/TICKET-123
+            ticket_key = self._extract_jira_ticket_key(url)
+            if ticket_key:
+                # Return Jira macro instead of regular link
+                return (
+                    f'<ac:structured-macro ac:name="jira" ac:schema-version="1">'
+                    f'<ac:parameter ac:name="key">{escape(ticket_key, quote=False)}</ac:parameter>'
+                    f'</ac:structured-macro>'
+                )
+
+        # Regular link (not a Jira ticket)
         # Escape URL but preserve already-encoded entities
         url = escape(url, quote=False)
         if title:
             title = escape(title, quote=False)
             return f'<a href="{url}" title="{title}">{text}</a>'
         return f'<a href="{url}">{text}</a>'
+
+    def _extract_jira_ticket_key(self, url: str) -> Optional[str]:
+        """
+        Extract Jira ticket key from a Jira URL.
+
+        Args:
+            url: Jira URL (e.g., "https://jira.lvm.de/jira/browse/PROJ-123")
+
+        Returns:
+            Ticket key (e.g., "PROJ-123") or None if not found
+        """
+        import re
+        # Pattern to match Jira ticket keys (PROJECT-NUMBER format)
+        # Common URL patterns:
+        # - /browse/TICKET-123
+        # - /browse/TICKET-123?param=value
+        # - /projects/PROJECT/issues/TICKET-123
+        match = re.search(r'/browse/([A-Z][A-Z0-9_]+-\d+)', url)
+        if match:
+            return match.group(1)
+
+        # Also support direct ticket key at end of URL
+        match = re.search(r'/([A-Z][A-Z0-9_]+-\d+)(?:\?|$)', url)
+        if match:
+            return match.group(1)
+
+        return None
 
     def image(self, alt: str, url: str, title: Optional[str] = None, **attrs: Any) -> str:
         """
