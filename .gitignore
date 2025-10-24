@@ -85,3 +85,4 @@ rootfs/usr/local/share/ca-certificates/*
 
 # Generated
 md2cf-api
+.claude

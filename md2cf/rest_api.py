@@ -6,7 +6,8 @@ to Confluence Storage Format and publishing to Confluence.
 """
 
 import logging
-from typing import Annotated, List, Optional, Union
+import re
+from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, Depends, File, Form, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,6 +62,7 @@ class PublishRequest(BaseModel):
     parent_id: Optional[str] = Field(None, description="Parent page ID (optional)")
     cloud: bool = Field(True, description="Whether this is Confluence Cloud (vs Server)")
     jira_url: Optional[str] = Field(None, description="Base Jira URL for converting Jira ticket links to macros (e.g., 'https://jira.lvm.de/jira')")
+    add_info_panel: bool = Field(True, description="Whether to add an info panel indicating the page was generated from Markdown")
 
 
 class PublishResponse(BaseModel):
@@ -377,6 +379,7 @@ def publish_request_form(
     parent_id: Optional[str] = Form(None, description="Parent page ID (optional)"),
     cloud: bool = Form(True, description="Whether this is Confluence Cloud (vs Server)"),
     jira_url: Optional[str] = Form(None, description="Base Jira URL for converting Jira ticket links to macros"),
+    add_info_panel: bool = Form(True, description="Whether to add an info panel indicating the page was generated from Markdown"),
 ) -> PublishRequest:
     """Helper function to create PublishRequest from form data."""
     return PublishRequest(
@@ -387,7 +390,8 @@ def publish_request_form(
         title=title,
         parent_id=parent_id,
         cloud=cloud,
-        jira_url=jira_url
+        jira_url=jira_url,
+        add_info_panel=add_info_panel
     )
 
 
@@ -441,22 +445,15 @@ async def publish_to_confluence(
             attachment_paths[attachment.filename] = str(temp_path)
             logger.info(f"Saved attachment: {attachment.filename} to {temp_path}")
 
-        # Convert Markdown with base path for resolving image references
-        if attachment_paths:
-            # Create a virtual base path mapping
-            converter = MarkdownToConfluence(jira_url=request.jira_url)
-            content = converter.convert(request.markdown, extract_images=True)
-            image_refs = converter.get_image_references()
-        else:
-            converter = MarkdownToConfluence(jira_url=request.jira_url)
-            content = converter.convert(request.markdown)
-            image_refs = []
-
-        with open("/app/examples/.testdaten/input.md", "w") as f:
-            f.write(request.markdown)
-
-        with open("/app/examples/.testdaten/output.html", "w") as f:
-            f.write(content)
+        # Determine markdown attachment filename
+        # We'll use the page title as the markdown filename, but sanitize it for filesystem
+        # Replace characters that are problematic in filenames
+        safe_title = re.sub(r'[<>:"/\\|?*]', '_', request.title)
+        # Also replace multiple spaces/underscores with single underscore
+        safe_title = re.sub(r'[_\s]+', '_', safe_title)
+        # Remove leading/trailing underscores
+        safe_title = safe_title.strip('_')
+        markdown_filename = f"{safe_title}.md"
 
         # Initialize Confluence client
         client = ConfluenceClient(
@@ -473,6 +470,30 @@ async def publish_to_confluence(
                 detail=f"Space '{request.space}' not found"
             )
 
+        # First convert without info panel to create initial page
+        if attachment_paths:
+            converter = MarkdownToConfluence(
+                jira_url=request.jira_url,
+                add_info_panel=False,
+                markdown_attachment_name=None
+            )
+            content = converter.convert(request.markdown, extract_images=True)
+            image_refs = converter.get_image_references()
+        else:
+            converter = MarkdownToConfluence(
+                jira_url=request.jira_url,
+                add_info_panel=False,
+                markdown_attachment_name=None
+            )
+            content = converter.convert(request.markdown)
+            image_refs = []
+
+        with open("/app/examples/.testdaten/input.md", "w") as f:
+            f.write(request.markdown)
+
+        with open("/app/examples/.testdaten/output.html", "w") as f:
+            f.write(content)
+
         # Create or update page
         page = client.create_or_update_page(
             space=request.space,
@@ -484,9 +505,48 @@ async def publish_to_confluence(
         page_id = page["id"]
         logger.info(f"Page created/updated: {page_id}")
 
+        # Now convert again with page_id to add the info panel with correct values
+        if request.add_info_panel:
+            converter_with_info = MarkdownToConfluence(
+                jira_url=request.jira_url,
+                add_info_panel=True,
+                markdown_attachment_name=markdown_filename,
+                page_id=page_id,
+                space_key=request.space,
+                page_title=request.title
+            )
+
+            # Re-convert with info panel
+            content_with_info = converter_with_info.convert(request.markdown, extract_images=False)
+
+            # Update the page with the info panel
+            page = client.create_or_update_page(
+                space=request.space,
+                title=request.title,
+                body=content_with_info,
+                parent_id=request.parent_id
+            )
+            logger.info(f"Updated page with info panel: {page_id}")
+
         # Fetch the page again with full version details to ensure we have all metadata
         # The create/update response might not include all version.by details
         page = client.get_page_by_id(page_id, expand="version,space")
+
+        # Upload the original markdown as attachment (if info panel is enabled)
+        if request.add_info_panel:
+            try:
+                # Create temporary markdown file
+                markdown_temp_path = PathLib(temp_dir) / markdown_filename
+                markdown_temp_path.write_text(request.markdown, encoding='utf-8')
+
+                client.attach_file(
+                    page_id=page_id,
+                    file_path=str(markdown_temp_path),
+                    comment="Original Markdown source file"
+                )
+                logger.info(f"Uploaded markdown source file: {markdown_filename}")
+            except Exception as e:
+                logger.error(f"Failed to upload markdown source file: {e}")
 
         # Upload attachments
         uploaded_count = 0

@@ -93,7 +93,12 @@ class MarkdownToConfluence:
     def __init__(
         self,
         base_path: Optional[Union[str, Path]] = None,
-        jira_url: Optional[str] = None
+        jira_url: Optional[str] = None,
+        add_info_panel: bool = True,
+        markdown_attachment_name: Optional[str] = None,
+        page_id: Optional[str] = None,
+        space_key: Optional[str] = None,
+        page_title: Optional[str] = None
     ) -> None:
         """
         Initialize the converter with Confluence renderer.
@@ -102,10 +107,22 @@ class MarkdownToConfluence:
             base_path: Base path for resolving relative image paths (optional)
             jira_url: Base Jira URL for detecting Jira ticket links (optional)
                      e.g., "https://jira.lvm.de/jira/"
+            add_info_panel: Whether to add an info panel indicating the page was
+                           generated from Markdown (default: True)
+            markdown_attachment_name: Filename of the markdown attachment to link in
+                                     the info panel (optional, e.g., "document.md")
+            page_id: Confluence page ID for the CLI example (optional)
+            space_key: Confluence space key for the CLI example (optional)
+            page_title: Page title for the CLI example (optional)
         """
         self.renderer = ConfluenceStorageFormatRenderer()
         self.image_attrs_parser = ImageAttributesParser()
         self.jira_url = jira_url.rstrip('/') if jira_url else None
+        self.add_info_panel = add_info_panel
+        self.markdown_attachment_name = markdown_attachment_name
+        self.page_id = page_id
+        self.space_key = space_key
+        self.page_title = page_title
         self.markdown = mistune.create_markdown(
             renderer=self.renderer,
             plugins=[
@@ -120,6 +137,8 @@ class MarkdownToConfluence:
         logger.debug("Initialized MarkdownToConfluence converter")
         if self.jira_url:
             logger.debug(f"Jira URL configured: {self.jira_url}")
+        if self.markdown_attachment_name:
+            logger.debug(f"Markdown attachment name: {self.markdown_attachment_name}")
 
     def convert(self, markdown_content: str, extract_images: bool = False) -> str:
         """
@@ -164,10 +183,73 @@ class MarkdownToConfluence:
             logger.debug(f"Converted to {len(result)} characters of Confluence format")
             if extract_images and self.image_references:
                 logger.info(f"Extracted {len(self.image_references)} image references")
+
+            # Add info panel at the top if enabled
+            if self.add_info_panel:
+                info_panel = self._generate_info_panel()
+                result = info_panel + result
+
             return result
         else:
             logger.error(f"Unexpected conversion result type: {type(result)}")
             return str(result)
+
+    def _generate_info_panel(self) -> str:
+        """
+        Generate an info panel indicating the page was generated from Markdown.
+
+        If markdown_attachment_name is set, includes a link to the markdown attachment
+        and a CLI example for downloading and re-publishing.
+
+        Returns:
+            Confluence info macro markup
+        """
+        if self.markdown_attachment_name:
+            # Include link to markdown attachment with CLI example
+            from html import escape
+            filename_escaped = escape(self.markdown_attachment_name, quote=False)
+
+            # Use actual values if available, otherwise use placeholders
+            page_id_value = self.page_id if self.page_id else "PAGE_ID"
+            space_key_value = self.space_key if self.space_key else "SPACE_KEY"
+
+            # For title, escape quotes for use in command line
+            if self.page_title:
+                title_value = self.page_title.replace('"', '\\"')
+            else:
+                title_value = "TITLE"
+
+            # Create CLI example (simplified - assumes env vars are set)
+            cli_example = (
+                f'# Download:<br/>'
+                f'md2cf download-attachment {page_id_value} "{filename_escaped}"<br/><br/>'
+                f'# Nach Änderungen re-publish:<br/>'
+                f'md2cf publish ./{filename_escaped} --space {space_key_value} --title "{title_value}"'
+            )
+
+            return (
+                '<ac:structured-macro ac:name="info" ac:schema-version="1">'
+                '<ac:rich-text-body>'
+                '<p>Diese Seite wurde automatisch aus Markdown generiert. '
+                'Original-Datei: '
+                '<ac:link>'
+                f'<ri:attachment ri:filename="{filename_escaped}" />'
+                '</ac:link>'
+                '</p>'
+                '<p><strong>CLI-Beispiel:</strong></p>'
+                f'<pre>{cli_example}</pre>'
+                '</ac:rich-text-body>'
+                '</ac:structured-macro>\n'
+            )
+        else:
+            # No attachment link
+            return (
+                '<ac:structured-macro ac:name="info" ac:schema-version="1">'
+                '<ac:rich-text-body>'
+                '<p>Diese Seite wurde automatisch aus Markdown generiert.</p>'
+                '</ac:rich-text-body>'
+                '</ac:structured-macro>\n'
+            )
 
     def get_image_references(self) -> List[Dict[str, str]]:
         """

@@ -540,3 +540,82 @@ class ConfluenceClient:
         except Exception as e:
             logger.error(f"Error deleting attachment {attachment_id}: {e}")
             raise
+
+    def download_attachment(
+        self,
+        page_id: str,
+        filename: str,
+        output_path: str,
+    ) -> str:
+        """
+        Download an attachment from a Confluence page.
+
+        Args:
+            page_id: Page ID
+            filename: Name of the attachment to download
+            output_path: Path where to save the downloaded file
+
+        Returns:
+            Path to the downloaded file
+
+        Example:
+            >>> downloaded_path = client.download_attachment(
+            ...     page_id="123456",
+            ...     filename="document.md",
+            ...     output_path="./downloads/document.md"
+            ... )
+            >>> print(f"Downloaded to: {downloaded_path}")
+        """
+        try:
+            from pathlib import Path
+
+            # Get all attachments for the page
+            attachments = self.get_attachments(page_id)
+
+            # Find the attachment with matching filename
+            attachment = None
+            for att in attachments:
+                if att.get("title") == filename:
+                    attachment = att
+                    break
+
+            if not attachment:
+                raise FileNotFoundError(f"Attachment '{filename}' not found on page {page_id}")
+
+            # Get download URL
+            download_url = attachment.get("_links", {}).get("download")
+            if not download_url:
+                raise ValueError(f"No download link found for attachment '{filename}'")
+
+            # Make it an absolute URL
+            if download_url.startswith("/"):
+                download_url = self.url + download_url
+
+            # Download the file
+            import requests
+            headers = {
+                "Authorization": f"Bearer {self.token}"
+            }
+
+            response = requests.get(
+                download_url,
+                headers=headers,
+                verify=self.verify_ssl,
+                stream=True
+            )
+            response.raise_for_status()
+
+            # Save to output path
+            output_file = Path(output_path)
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(output_file, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            logger.info(f"Downloaded attachment '{filename}' from page {page_id} to {output_path}")
+            return str(output_file.resolve())
+
+        except Exception as e:
+            logger.error(f"Error downloading attachment '{filename}' from page {page_id}: {e}")
+            raise
