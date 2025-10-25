@@ -32,9 +32,9 @@ RUN pip config set global.index-url https://repository.lvm.de/nexus/repository/p
 COPY pyproject.toml README.md ./
 COPY md2cf/ ./md2cf/
 
-# Install dependencies
+# Install dependencies (not in editable mode for multi-stage build)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e ".[rest]" && \
+    pip install --no-cache-dir ".[rest]" && \
     pip install --no-cache-dir gunicorn && \
     pip install --no-cache-dir pip-system-certs
 
@@ -63,29 +63,33 @@ RUN useradd -m -u 1000 -s /bin/bash md2cf && \
 
 WORKDIR /app
 
-# Copy Python packages from builder
+# Copy Python packages from builder (includes installed md2cf package)
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
-COPY --chown=md2cf:md2cf md2cf/ ./md2cf/
-COPY --chown=md2cf:md2cf pyproject.toml README.md ./
+# Copy entrypoint script
+COPY --chown=md2cf:md2cf docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Create examples directory for REST API (optional)
+RUN mkdir -p /app/examples/.testdaten && chown -R md2cf:md2cf /app/examples
+
+# Create directory for CLI workspace
+RUN mkdir -p /workspace && chown md2cf:md2cf /workspace
+VOLUME /workspace
 
 # Switch to non-root user
 USER md2cf
 
-# Expose port
+# Expose port (for REST API mode)
 EXPOSE 8000
 
-# Health check
+# Health check (only relevant in REST API mode)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Default command: Production server with Gunicorn
-CMD ["gunicorn", "md2cf.rest_api:app", \
-     "--workers", "4", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-", \
-     "--log-level", "info"]
+# Set entrypoint
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Default command: Start REST API server
+CMD []

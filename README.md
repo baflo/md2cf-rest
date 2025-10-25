@@ -33,7 +33,27 @@ pip install -e ".[dev]"
 
 ## Quick Start
 
-### Convert Markdown to Confluence Format
+### Option 1: Docker (Empfohlen)
+
+```bash
+# Umgebungsvariablen setzen
+export CONFLUENCE_URL="https://yoursite.atlassian.net/wiki"
+export CONFLUENCE_TOKEN="YOUR_PAT_TOKEN"
+
+# Dokument publizieren
+docker run --rm -v $(pwd):/workspace \
+  -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
+  md2cf-api \
+  md2cf publish /workspace/README.md --space DEMO --title "Documentation"
+```
+
+**Siehe auch:**
+- Linux/macOS: [DOCKER_CLI_QUICK_REFERENCE.md](DOCKER_CLI_QUICK_REFERENCE.md)
+- Windows PowerShell: [POWERSHELL_USAGE.md](POWERSHELL_USAGE.md)
+
+### Option 2: Native Installation
+
+#### Convert Markdown to Confluence Format
 
 ```bash
 # Convert to stdout
@@ -43,7 +63,7 @@ md2cf convert README.md
 md2cf convert README.md -o output.html
 ```
 
-### Publish to Confluence
+#### Publish to Confluence
 
 ```bash
 md2cf publish README.md \
@@ -266,9 +286,16 @@ You can use environment variables instead of command-line arguments:
 export CONFLUENCE_URL="https://yoursite.atlassian.net"
 export CONFLUENCE_TOKEN="YOUR_PAT_TOKEN"
 export CONFLUENCE_SPACE="DEMO"
+export JIRA_URL="https://jira.lvm.de/jira"  # Optional, for Jira link conversion
 
 md2cf publish document.md
 ```
+
+Supported environment variables:
+- `CONFLUENCE_URL` - Confluence base URL
+- `CONFLUENCE_TOKEN` - Personal Access Token
+- `CONFLUENCE_SPACE` - Default space key (optional)
+- `JIRA_URL` - Jira base URL for automatic Jira ticket link conversion (optional)
 
 ## Development
 

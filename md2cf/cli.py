@@ -303,6 +303,7 @@ Environment Variables:
   CONFLUENCE_URL       Confluence base URL
   CONFLUENCE_TOKEN     Personal Access Token
   CONFLUENCE_SPACE     Default space key
+  JIRA_URL             Jira base URL for ticket link conversion
         """,
     )
 
@@ -388,7 +389,8 @@ Environment Variables:
     publish_parser.add_argument(
         "--jira-url",
         type=str,
-        help="Base Jira URL for converting Jira ticket links to macros (e.g., https://jira.lvm.de/jira)",
+        default=os.environ.get("JIRA_URL"),
+        help="Base Jira URL for converting Jira ticket links to macros (e.g., https://jira.lvm.de/jira) [env: JIRA_URL]",
     )
     publish_parser.add_argument(
         "--no-info-panel",

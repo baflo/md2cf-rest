@@ -3,9 +3,19 @@
 
 This is a comprehensive example demonstrating all supported Markdown features that can be converted to Confluence Storage Format.
 
+
 ## Introduction
 
 Welcome to the **md2cf** documentation. This tool allows you to convert Markdown files to Confluence pages seamlessly.
+
+## Atlassian
+
+### Jira
+
+Wenn eine verlinkte Logseq-Seite ein Page Property wie `external-url:: [FM-55485](https://jira.lvm.de/jira/browse/FM-55485)` hat, wird diese durch einen Link auf as Ticket ersetzt.
+
+Zum Beispiel ist  [FM-55813 Auftrag](https://jira.lvm.de/jira/browse/FM-55813)  eine solche Referenz.
+
 
 ## Text Formatting
 
@@ -278,14 +288,6 @@ CLOCK: [2025-10-23 Thu 11:04:41]--[2025-10-23 Thu 11:04:43] =>  00:00:02
 
 - Add images with descriptive alt text
 
-
-## Atlassian
-
-### Jira
-
-Wenn eine verlinkte Logseq-Seite ein Page Property wie `external-url:: [FM-55485](https://jira.lvm.de/jira/browse/FM-55485)` hat, wird diese durch einen Link auf as Ticket ersetzt.
-
-Zum Beispiel ist  [FM-55813 Auftrag](https://jira.lvm.de/jira/browse/FM-55813)  eine solche Referenz.
 
 ## Conclusion
 

@@ -230,7 +230,7 @@ class MarkdownToConfluence:
             return (
                 '<ac:structured-macro ac:name="info" ac:schema-version="1">'
                 '<ac:rich-text-body>'
-                '<p>Diese Seite wurde automatisch aus Markdown generiert. '
+                '<p>Diese Seite wurde mit <a href="https://bitbucket.lvm.de/bitbucket/users/m63119/repos/md2cf/browse">md2cf</a> automatisch aus Markdown generiert. '
                 'Original-Datei: '
                 '<ac:link>'
                 f'<ri:attachment ri:filename="{filename_escaped}" />'
@@ -246,7 +246,7 @@ class MarkdownToConfluence:
             return (
                 '<ac:structured-macro ac:name="info" ac:schema-version="1">'
                 '<ac:rich-text-body>'
-                '<p>Diese Seite wurde automatisch aus Markdown generiert.</p>'
+                '<p>Diese Seite wurde mit <a href="https://bitbucket.lvm.de/bitbucket/users/m63119/repos/md2cf/browse">md2cf</a> automatisch aus Markdown generiert.</p>'
                 '</ac:rich-text-body>'
                 '</ac:structured-macro>\n'
             )
