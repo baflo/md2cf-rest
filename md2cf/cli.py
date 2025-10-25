@@ -14,6 +14,7 @@ from typing import Optional
 
 from md2cf.api.confluence import ConfluenceClient
 from md2cf.converter import MarkdownToConfluence
+from md2cf.utils.frontmatter import FrontmatterMetadata, add_frontmatter, parse_frontmatter_metadata
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -106,9 +107,12 @@ def download_attachment_command(args: argparse.Namespace) -> int:
         return 1
 
 
-def publish_command(args: argparse.Namespace) -> int:
+def download_source_command(args: argparse.Namespace) -> int:
     """
-    Handle the publish command.
+    Handle the download-source command.
+
+    Downloads the original Markdown source file from a Confluence page
+    and adds frontmatter with page metadata.
 
     Args:
         args: Parsed command-line arguments
@@ -124,21 +128,117 @@ def publish_command(args: argparse.Namespace) -> int:
         if not args.token:
             logging.error("Confluence token is required (use --token or set CONFLUENCE_TOKEN env var)")
             return 1
-        if not args.space:
-            logging.error("Confluence space is required (use --space or set CONFLUENCE_SPACE env var)")
+
+        # Initialize Confluence client
+        client = ConfluenceClient(
+            url=args.url,
+            token=args.token,
+            cloud=args.cloud,
+            verify_ssl=not args.no_verify_ssl,
+        )
+
+        # Get page details to extract metadata
+        page = client.get_page_by_id(args.page_id, expand="version,space,ancestors")
+
+        if not page:
+            logging.error(f"Page with ID '{args.page_id}' not found")
             return 1
 
+        # Determine the markdown attachment filename from page title
+        import re
+        safe_title = re.sub(r'[<>:"/\\|?*]', '_', page['title'])
+        safe_title = re.sub(r'[_\s]+', '_', safe_title)
+        safe_title = safe_title.strip('_')
+        markdown_filename = f"{safe_title}.md"
+
+        # Determine output path
+        if args.output:
+            output_path = args.output
+        else:
+            output_path = f"./{markdown_filename}"
+
+        # Download the markdown attachment
+        downloaded_path = client.download_attachment(
+            page_id=args.page_id,
+            filename=markdown_filename,
+            output_path=output_path,
+        )
+
+        # Read the downloaded content
+        with open(downloaded_path, 'r', encoding='utf-8') as f:
+            markdown_content = f.read()
+
+        # Extract parent ID if available
+        ancestors = page.get('ancestors', [])
+        parent_id = ancestors[-1]['id'] if ancestors else None
+
+        # Create frontmatter metadata from page info
+        metadata = FrontmatterMetadata(
+            page_id=page['id'],
+            space_key=page['space']['key'],
+            title=page['title'],
+            version=page['version']['number'],
+            parent_id=parent_id,
+        )
+
+        # Add frontmatter to markdown content
+        markdown_with_frontmatter = add_frontmatter(markdown_content, metadata)
+
+        # Write back to file
+        with open(downloaded_path, 'w', encoding='utf-8') as f:
+            f.write(markdown_with_frontmatter)
+
+        print(f"Successfully downloaded source Markdown")
+        print(f"File: {markdown_filename}")
+        print(f"Saved to: {downloaded_path}")
+        print(f"Page ID: {page['id']}")
+        print(f"Space: {page['space']['key']}")
+        print(f"Version: {page['version']['number']}")
+
+        return 0
+    except Exception as e:
+        logging.error(f"Download failed: {e}")
+        return 1
+
+
+def publish_command(args: argparse.Namespace) -> int:
+    """
+    Handle the publish command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
         input_path = Path(args.input)
 
         # Read markdown file first
         with open(input_path, "r", encoding="utf-8") as f:
-            markdown_content = f.read()
+            markdown_content_raw = f.read()
 
-        # Determine page title first (needed for markdown attachment filename)
-        if args.title:
-            title = args.title
-        else:
-            # Use filename without extension as title
+        # Parse frontmatter metadata
+        frontmatter_meta, markdown_content = parse_frontmatter_metadata(markdown_content_raw)
+
+        # Use frontmatter as defaults, CLI args override
+        space = args.space or frontmatter_meta.space_key
+        title = args.title or frontmatter_meta.title
+        parent_id = args.parent_id or frontmatter_meta.parent_id
+
+        # Validate required arguments (after frontmatter defaults)
+        if not args.url:
+            logging.error("Confluence URL is required (use --url or set CONFLUENCE_URL env var)")
+            return 1
+        if not args.token:
+            logging.error("Confluence token is required (use --token or set CONFLUENCE_TOKEN env var)")
+            return 1
+        if not space:
+            logging.error("Confluence space is required (use --space, set CONFLUENCE_SPACE env var, or include in frontmatter)")
+            return 1
+
+        # If title still not set, derive from filename
+        if not title:
             title = input_path.stem.replace("-", " ").replace("_", " ").title()
 
         # Initialize converter with base path for resolving image paths and optional jira_url
@@ -161,18 +261,75 @@ def publish_command(args: argparse.Namespace) -> int:
         )
 
         # Verify space exists
-        space = client.get_space(args.space)
-        if not space:
-            logging.error(f"Space '{args.space}' not found")
+        space_info = client.get_space(space)
+        if not space_info:
+            logging.error(f"Space '{space}' not found")
             return 1
 
-        # First convert without page_id (to create initial page)
-        converter = MarkdownToConfluence(
-            base_path=input_path.parent,
-            jira_url=jira_url,
-            add_info_panel=False,  # Disable initially
-            markdown_attachment_name=None
-        )
+        # Version check: if frontmatter has page_id and version, verify we're not behind
+        if frontmatter_meta.page_id and frontmatter_meta.version is not None:
+            logging.info(f"Frontmatter indicates page ID: {frontmatter_meta.page_id}, version: {frontmatter_meta.version}")
+
+            # Get current page version from Confluence
+            try:
+                current_page = client.get_page_by_id(frontmatter_meta.page_id, expand="version")
+                if current_page:
+                    current_version = current_page['version']['number']
+
+                    if frontmatter_meta.version < current_version:
+                        logging.error(
+                            f"Version conflict: Local version ({frontmatter_meta.version}) is behind "
+                            f"Confluence version ({current_version}). "
+                            f"Please download the latest version with 'download-source' before publishing."
+                        )
+                        return 1
+
+                    logging.info(f"Version check passed: local={frontmatter_meta.version}, remote={current_version}")
+            except Exception as e:
+                logging.warning(f"Could not verify page version: {e}")
+
+        # Check if page already exists (either from frontmatter or by looking it up)
+        existing_page = None
+        is_new_page = True
+
+        if frontmatter_meta.page_id:
+            # We have a page ID from frontmatter, use it directly
+            page_id = frontmatter_meta.page_id
+            is_new_page = False
+            logging.info(f"Using page ID from frontmatter: {page_id}")
+        else:
+            # Try to find existing page by title
+            existing_page = client.get_page_by_title(space=space, title=title)
+            if existing_page:
+                page_id = existing_page['id']
+                is_new_page = False
+                logging.info(f"Found existing page by title: {page_id}")
+            else:
+                page_id = None
+                is_new_page = True
+                logging.info("Creating new page")
+
+        # For existing pages: convert with info panel directly
+        # For new pages: convert without info panel first, then update
+        if is_new_page:
+            # Create page without info panel first (we don't have page_id yet)
+            converter = MarkdownToConfluence(
+                base_path=input_path.parent,
+                jira_url=jira_url,
+                add_info_panel=False,
+                markdown_attachment_name=None
+            )
+        else:
+            # Update existing page with info panel directly
+            converter = MarkdownToConfluence(
+                base_path=input_path.parent,
+                jira_url=jira_url,
+                add_info_panel=add_info_panel,
+                markdown_attachment_name=markdown_filename if add_info_panel else None,
+                page_id=page_id,
+                space_key=space,
+                page_title=title
+            )
 
         # Convert Markdown to Confluence format and extract image references
         confluence_content = converter.convert(markdown_content, extract_images=True)
@@ -180,24 +337,24 @@ def publish_command(args: argparse.Namespace) -> int:
 
         # Create or update page
         page = client.create_or_update_page(
-            space=args.space,
+            space=space,
             title=title,
             body=confluence_content,
-            parent_id=args.parent_id,
+            parent_id=parent_id,
         )
 
         page_id = page['id']
         logging.info(f"Page created/updated: {page_id}")
 
-        # Now convert again with page_id to add the info panel with correct values
-        if add_info_panel:
+        # For new pages: add info panel now that we have the page_id
+        if is_new_page and add_info_panel:
             converter_with_info = MarkdownToConfluence(
                 base_path=input_path.parent,
                 jira_url=jira_url,
                 add_info_panel=True,
                 markdown_attachment_name=markdown_filename,
                 page_id=page_id,
-                space_key=args.space,
+                space_key=space,
                 page_title=title
             )
 
@@ -205,23 +362,37 @@ def publish_command(args: argparse.Namespace) -> int:
             confluence_content_with_info = converter_with_info.convert(markdown_content, extract_images=False)
 
             # Update the page with the info panel
-            page = client.create_or_update_page(
-                space=args.space,
+            page = client.update_page(
+                page_id=page_id,
                 title=title,
                 body=confluence_content_with_info,
-                parent_id=args.parent_id,
+                parent_id=parent_id,
             )
-            logging.info(f"Updated page with info panel: {page_id}")
+            logging.info(f"Added info panel to new page: {page_id}")
 
         # Upload the original markdown file as attachment (if info panel is enabled)
         if add_info_panel:
             try:
+                # Create a temporary file with the correct name based on the page title
+                # This ensures download-source can find it later
+                import tempfile
+                temp_dir = tempfile.mkdtemp()
+                temp_markdown_path = Path(temp_dir) / markdown_filename
+
+                # Copy content to temp file with correct name
+                with open(temp_markdown_path, 'w', encoding='utf-8') as f:
+                    f.write(markdown_content_raw)
+
                 client.attach_file(
                     page_id=page_id,
-                    file_path=str(input_path.resolve()),
+                    file_path=str(temp_markdown_path),
                     comment="Original Markdown source file"
                 )
                 logging.info(f"Uploaded markdown source file: {markdown_filename}")
+
+                # Clean up temp file
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
             except Exception as e:
                 logging.error(f"Failed to upload markdown source file: {e}")
 
@@ -253,11 +424,38 @@ def publish_command(args: argparse.Namespace) -> int:
             if failed_count > 0:
                 print(f"Failed to upload {failed_count} attachment(s)")
 
+        # Fetch the updated page to get the new version number
+        updated_page = client.get_page_by_id(page_id, expand="version,space,ancestors")
+
+        # Extract parent ID if available
+        ancestors = updated_page.get('ancestors', [])
+        new_parent_id = ancestors[-1]['id'] if ancestors else None
+
+        # Update frontmatter with new metadata
+        updated_metadata = FrontmatterMetadata(
+            page_id=updated_page['id'],
+            space_key=updated_page['space']['key'],
+            title=updated_page['title'],
+            version=updated_page['version']['number'],
+            parent_id=new_parent_id,
+        )
+
+        # Update the local markdown file with new frontmatter
+        markdown_with_updated_frontmatter = add_frontmatter(markdown_content, updated_metadata)
+
+        # Write back to the original file
+        with open(input_path, 'w', encoding='utf-8') as f:
+            f.write(markdown_with_updated_frontmatter)
+
+        logging.info(f"Updated frontmatter: version {updated_metadata.version}")
+
         # Print success message with URL
         page_url = client.get_page_url(page)
         print(f"Successfully published page: {title}")
         print(f"Page ID: {page_id}")
+        print(f"Version: {updated_metadata.version}")
         print(f"URL: {page_url}")
+        print(f"Local file updated with new frontmatter")
 
         return 0
     except Exception as e:
@@ -449,6 +647,52 @@ Environment Variables:
         help="Disable SSL certificate verification",
     )
 
+    # Download-source command
+    download_source_parser = subparsers.add_parser(
+        "download-source",
+        help="Download the original Markdown source file from a Confluence page with frontmatter metadata",
+    )
+    download_source_parser.add_argument(
+        "page_id",
+        type=str,
+        help="Page ID containing the Markdown source",
+    )
+    download_source_parser.add_argument(
+        "-o", "--output",
+        type=str,
+        required=False,
+        help="Output path where to save the file (default: ./<page_title>.md)",
+    )
+    download_source_parser.add_argument(
+        "--url",
+        type=str,
+        default=os.environ.get("CONFLUENCE_URL"),
+        help="Confluence base URL (e.g., https://yoursite.atlassian.net) [env: CONFLUENCE_URL]",
+    )
+    download_source_parser.add_argument(
+        "--token",
+        type=str,
+        default=os.environ.get("CONFLUENCE_TOKEN"),
+        help="Personal Access Token for authentication [env: CONFLUENCE_TOKEN]",
+    )
+    download_source_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        default=True,
+        help="Use Confluence Cloud API (default: True)",
+    )
+    download_source_parser.add_argument(
+        "--server",
+        action="store_false",
+        dest="cloud",
+        help="Use Confluence Server/Data Center API",
+    )
+    download_source_parser.add_argument(
+        "--no-verify-ssl",
+        action="store_true",
+        help="Disable SSL certificate verification",
+    )
+
     return parser
 
 
@@ -477,6 +721,8 @@ def main(argv: Optional[list] = None) -> int:
         return publish_command(args)
     elif args.command == "download-attachment":
         return download_attachment_command(args)
+    elif args.command == "download-source":
+        return download_source_command(args)
     else:
         parser.print_help()
         return 1

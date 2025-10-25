@@ -433,7 +433,8 @@ async def publish_to_confluence(
         attachment_paths = {}
 
         # Save uploaded files to temp directory with their original filenames
-        for attachment in attachments:
+        # Handle case where attachments is None (no files uploaded)
+        for attachment in (attachments or []):
             # Use original filename in temp directory
             temp_path = PathLib(temp_dir) / attachment.filename
 
@@ -470,23 +471,60 @@ async def publish_to_confluence(
                 detail=f"Space '{request.space}' not found"
             )
 
-        # First convert without info panel to create initial page
-        if attachment_paths:
-            converter = MarkdownToConfluence(
-                jira_url=request.jira_url,
-                add_info_panel=False,
-                markdown_attachment_name=None
-            )
-            content = converter.convert(request.markdown, extract_images=True)
-            image_refs = converter.get_image_references()
+        # Check if page already exists by title
+        existing_page = client.get_page_by_title(space=request.space, title=request.title)
+        is_new_page = existing_page is None
+        page_id = existing_page['id'] if existing_page else None
+
+        if is_new_page:
+            logger.info("Creating new page")
         else:
-            converter = MarkdownToConfluence(
-                jira_url=request.jira_url,
-                add_info_panel=False,
-                markdown_attachment_name=None
-            )
-            content = converter.convert(request.markdown)
-            image_refs = []
+            logger.info(f"Found existing page by title: {page_id}")
+
+        # For existing pages: convert with info panel directly
+        # For new pages: convert without info panel first, then update
+        if is_new_page:
+            # Create page without info panel first (we don't have page_id yet)
+            if attachment_paths:
+                converter = MarkdownToConfluence(
+                    jira_url=request.jira_url,
+                    add_info_panel=False,
+                    markdown_attachment_name=None
+                )
+                content = converter.convert(request.markdown, extract_images=True)
+                image_refs = converter.get_image_references()
+            else:
+                converter = MarkdownToConfluence(
+                    jira_url=request.jira_url,
+                    add_info_panel=False,
+                    markdown_attachment_name=None
+                )
+                content = converter.convert(request.markdown)
+                image_refs = []
+        else:
+            # Update existing page with info panel directly
+            if attachment_paths:
+                converter = MarkdownToConfluence(
+                    jira_url=request.jira_url,
+                    add_info_panel=request.add_info_panel,
+                    markdown_attachment_name=markdown_filename if request.add_info_panel else None,
+                    page_id=page_id,
+                    space_key=request.space,
+                    page_title=request.title
+                )
+                content = converter.convert(request.markdown, extract_images=True)
+                image_refs = converter.get_image_references()
+            else:
+                converter = MarkdownToConfluence(
+                    jira_url=request.jira_url,
+                    add_info_panel=request.add_info_panel,
+                    markdown_attachment_name=markdown_filename if request.add_info_panel else None,
+                    page_id=page_id,
+                    space_key=request.space,
+                    page_title=request.title
+                )
+                content = converter.convert(request.markdown)
+                image_refs = []
 
         with open("/app/examples/.testdaten/input.md", "w") as f:
             f.write(request.markdown)
@@ -505,8 +543,8 @@ async def publish_to_confluence(
         page_id = page["id"]
         logger.info(f"Page created/updated: {page_id}")
 
-        # Now convert again with page_id to add the info panel with correct values
-        if request.add_info_panel:
+        # For new pages: add info panel now that we have the page_id
+        if is_new_page and request.add_info_panel:
             converter_with_info = MarkdownToConfluence(
                 jira_url=request.jira_url,
                 add_info_panel=True,
@@ -520,13 +558,13 @@ async def publish_to_confluence(
             content_with_info = converter_with_info.convert(request.markdown, extract_images=False)
 
             # Update the page with the info panel
-            page = client.create_or_update_page(
-                space=request.space,
+            page = client.update_page(
+                page_id=page_id,
                 title=request.title,
                 body=content_with_info,
                 parent_id=request.parent_id
             )
-            logger.info(f"Updated page with info panel: {page_id}")
+            logger.info(f"Added info panel to new page: {page_id}")
 
         # Fetch the page again with full version details to ensure we have all metadata
         # The create/update response might not include all version.by details

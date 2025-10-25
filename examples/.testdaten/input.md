@@ -17,6 +17,11 @@ Wenn eine verlinkte Logseq-Seite ein Page Property wie `external-url:: [FM-5548
 Zum Beispiel ist  [FM-55813 Auftrag](https://jira.lvm.de/jira/browse/FM-55813)  eine solche Referenz.
 
 
+### Confluence
+
+Eine [andere gepublishte Seite](https://confluence.lvm.de/confluence/display/~m63119/andere+gepublishte+seite) wird in Confluence referenziert.
+
+
 ## Text Formatting
 
 You can use various text formatting options:

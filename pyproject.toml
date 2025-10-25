@@ -30,6 +30,7 @@ dependencies = [
     "atlassian-python-api>=3.41.0",
     "requests>=2.31.0",
     "python-multipart (>=0.0.20,<0.0.21)",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
