@@ -103,13 +103,13 @@ setup-hooks:
 # Docker commands
 docker-build:
 	@echo "Building Docker image..."
-	docker build -t md2cf-rest:latest -f Dockerfile .
-	@echo "✅ Image built: md2cf-rest:latest"
+	docker build -t md2cf:latest -f Dockerfile .
+	@echo "✅ Image built: md2cf:latest"
 
 docker-build-dev:
 	@echo "Building development Docker image..."
-	docker build -t md2cf-rest:dev -f Dockerfile.dev .
-	@echo "✅ Image built: md2cf-rest:dev"
+	docker build -t md2cf:dev -f Dockerfile.dev .
+	@echo "✅ Image built: md2cf:dev"
 
 docker-run:
 	@echo "Starting production container..."
@@ -117,7 +117,7 @@ docker-run:
 		--name md2cf-api \
 		-p 8000:8000 \
 		--restart unless-stopped \
-		md2cf-rest:latest
+		md2cf:latest
 	@echo "✅ Container started: md2cf-api"
 	@echo "   API URL: http://localhost:8000"
 	@echo "   Health: http://localhost:8000/health"
@@ -158,18 +158,18 @@ docker-logs-dev:
 
 docker-shell:
 	@docker exec -it md2cf-api /bin/bash || \
-		docker run --rm -it md2cf-rest:latest /bin/bash
+		docker run --rm -it md2cf:latest /bin/bash
 
 docker-shell-dev:
 	@docker exec -it md2cf-api-dev /bin/bash || \
-		docker run --rm -it md2cf-rest:latest /bin/bash
+		docker run --rm -it md2cf:latest /bin/bash
 
 docker-clean:
 	@echo "Cleaning up Docker resources..."
 	docker compose down -v
 	-docker stop md2cf-api 2>/dev/null || true
 	-docker rm md2cf-api 2>/dev/null || true
-	-docker rmi md2cf-rest:latest md2cf-rest:dev 2>/dev/null || true
+	-docker rmi md2cf:latest md2cf:dev 2>/dev/null || true
 	@echo "✅ Docker resources cleaned"
 
 docker-rebuild: docker-clean docker-build
@@ -177,9 +177,9 @@ docker-rebuild: docker-clean docker-build
 
 docker-test:
 	@echo "Testing Docker image..."
-	@docker build -t md2cf-rest:test -f Dockerfile .
-	@docker run --rm -d --name md2cf-test -p 8001:8000 md2cf-rest:test
+	@docker build -t md2cf:test -f Dockerfile .
+	@docker run --rm -d --name md2cf-test -p 8001:8000 md2cf:test
 	@sleep 3
 	@curl -f http://localhost:8001/health && echo "\n✅ Container is healthy" || echo "\n❌ Health check failed"
 	@docker stop md2cf-test
-	@docker rmi md2cf-rest:test
+	@docker rmi md2cf:test

@@ -98,7 +98,7 @@ function md2cf {
     }
 
     # Image und Befehl hinzufügen
-    $dockerArgs += 'md2cf-rest'
+    $dockerArgs += 'md2cf'
     $dockerArgs += 'md2cf'
 
     # Benutzer-Argumente hinzufügen
@@ -296,7 +296,7 @@ version: '3.8'
 
 services:
   api:
-    image: md2cf-rest
+    image: md2cf
     ports:
       - "8000:8000"
     environment:
@@ -317,7 +317,7 @@ docker-compose up -d
 md2cf publish document.md --space DEMO --title "Doc" -v
 
 # Docker Container Shell öffnen
-docker run --rm -it -v ./:/workspace md2cf-rest /bin/bash
+docker run --rm -it -v ./:/workspace md2cf /bin/bash
 ```
 
 ### REST API verwenden (Alternative)
@@ -326,7 +326,7 @@ Statt CLI kannst du auch die REST API verwenden:
 
 ```powershell
 # API starten
-docker run -d -p 8000:8000 --name md2cf-api md2cf-rest
+docker run -d -p 8000:8000 --name md2cf-api md2cf
 
 # API verwenden (mit Invoke-RestMethod)
 $markdown = Get-Content -Path README.md -Raw

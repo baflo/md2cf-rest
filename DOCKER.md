@@ -37,12 +37,12 @@ curl http://localhost:8000/health
 # Bauen
 make docker-build
 # oder
-docker build -t md2cf-rest:latest .
+docker build -t md2cf:latest .
 
 # Starten
 make docker-run
 # oder
-docker run -d -p 8000:8000 --name md2cf-api md2cf-rest:latest
+docker run -d -p 8000:8000 --name md2cf-api md2cf:latest
 ```
 
 ### Development Image (`Dockerfile.dev`)
@@ -150,7 +150,7 @@ docker run -d \
   -p 8000:8000 \
   -e LOG_LEVEL=debug \
   -e WORKERS=2 \
-  md2cf-rest:latest
+  md2cf:latest
 
 # Mit docker-compose
 # In docker-compose.yml unter environment:
@@ -169,10 +169,10 @@ environment:
 
 ```bash
 # Production
-docker run -p 8080:8000 md2cf-rest:latest  # API auf Port 8080
+docker run -p 8080:8000 md2cf:latest  # API auf Port 8080
 
 # Development mit Debugger
-docker run -p 8000:8000 -p 5678:5678 md2cf-rest:dev
+docker run -p 8000:8000 -p 5678:5678 md2cf:dev
 ```
 
 **Standard Ports:**
@@ -187,13 +187,13 @@ docker run -p 8000:8000 -p 5678:5678 md2cf-rest:dev
 docker run -d \
   -p 8000:8000 \
   -v $(pwd)/md2cf:/app/md2cf \
-  md2cf-rest:dev
+  md2cf:dev
 
 # Logs persistent speichern
 docker run -d \
   -p 8000:8000 \
   -v ./logs:/app/logs \
-  md2cf-rest:latest
+  md2cf:latest
 ```
 
 ---
@@ -254,10 +254,10 @@ docker exec md2cf-api whoami
 # Mit Trivy
 docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  aquasec/trivy image md2cf-rest:latest
+  aquasec/trivy image md2cf:latest
 
 # Mit Docker Scout
-docker scout cves md2cf-rest:latest
+docker scout cves md2cf:latest
 ```
 
 ---
@@ -305,7 +305,7 @@ docker run -d \
   --memory="512m" \
   --cpus="1.0" \
   -p 8000:8000 \
-  md2cf-rest:latest
+  md2cf:latest
 ```
 
 ---
@@ -348,7 +348,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: md2cf-rest:latest
+        image: md2cf:latest
         ports:
         - containerPort: 8000
         livenessProbe:
@@ -470,7 +470,7 @@ docker-build:
 docker logs md2cf-api
 
 # Container im Interactive Mode starten
-docker run -it --rm md2cf-rest:latest /bin/bash
+docker run -it --rm md2cf:latest /bin/bash
 
 # Health Check Status
 docker inspect md2cf-api | jq '.[0].State.Health'
@@ -480,7 +480,7 @@ docker inspect md2cf-api | jq '.[0].State.Health'
 
 ```bash
 # Anderen Port verwenden
-docker run -d -p 8080:8000 md2cf-rest:latest
+docker run -d -p 8080:8000 md2cf:latest
 
 # Oder in docker-compose.yml:
 ports:
@@ -495,20 +495,20 @@ docker run -d \
   --memory="1g" \
   --memory-swap="2g" \
   -p 8000:8000 \
-  md2cf-rest:latest
+  md2cf:latest
 ```
 
 ### Image zu groß
 
 ```bash
 # Image Size prüfen
-docker images md2cf-rest
+docker images md2cf
 
 # Layers analysieren
-docker history md2cf-rest:latest
+docker history md2cf:latest
 
 # Mit dive analysieren
-dive md2cf-rest:latest
+dive md2cf:latest
 ```
 
 ### Development: Code-Änderungen werden nicht übernommen
@@ -538,7 +538,7 @@ docker-compose up -d api-dev
 docker run -d \
   -p 8000:8000 \
   -e WORKERS=9 \
-  md2cf-rest:latest
+  md2cf:latest
 ```
 
 ### Memory Limits
@@ -549,7 +549,7 @@ docker run -d \
   --memory="512m" \
   --memory-reservation="256m" \
   -p 8000:8000 \
-  md2cf-rest:latest
+  md2cf:latest
 ```
 
 ### Gunicorn Tuning

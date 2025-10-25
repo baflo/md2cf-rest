@@ -23,8 +23,8 @@ uvicorn md2cf.rest_api:app --host 0.0.0.0 --port 8000 --reload
 
 ### Mit Docker (Optional)
 ```bash
-docker build -t md2cf-rest .
-docker run -p 8000:8000 md2cf-rest
+docker build -t md2cf .
+docker run -p 8000:8000 md2cf
 ```
 
 ## API Endpoints

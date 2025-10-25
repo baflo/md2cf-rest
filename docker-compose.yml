@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: md2cf-rest:latest
+    image: md2cf:latest
     container_name: md2cf-api
     ports:
       - "8000:8000"
@@ -27,7 +27,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: md2cf-rest:latest
+    image: md2cf:latest
     container_name: md2cf-api-dev
     ports:
       - "8000:8000"
@@ -48,7 +48,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: md2cf-rest:latest
+    image: md2cf:latest
     container_name: md2cf-watcher
     volumes:
       - ./md2cf:/app/md2cf

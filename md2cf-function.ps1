@@ -88,7 +88,7 @@ function md2cf {
     }
 
     # Image und Befehl hinzufügen
-    $dockerArgs += 'md2cf-rest'
+    $dockerArgs += 'md2cf'
     $dockerArgs += 'md2cf'
 
     # Benutzer-Argumente hinzufügen
