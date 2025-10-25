@@ -83,7 +83,8 @@ class TestCodeBlocks:
     def test_code_block_escaping(self, renderer: ConfluenceStorageFormatRenderer) -> None:
         """Test code block with special characters."""
         result = renderer.block_code("<html>", "html")
-        assert "&lt;html&gt;" in result
+        # Code is wrapped in CDATA, so it's not HTML-escaped
+        assert "<![CDATA[<html>]]>" in result
 
 
 class TestLists:
@@ -146,9 +147,10 @@ class TestBlockQuote:
     def test_blockquote(self, renderer: ConfluenceStorageFormatRenderer) -> None:
         """Test blockquote rendering."""
         result = renderer.block_quote("<p>Quote text</p>\n")
-        assert '<ac:structured-macro ac:name="quote"' in result
-        assert "<ac:rich-text-body>" in result
+        # Confluence uses simple blockquote tags, not quote macros
+        assert "<blockquote>" in result
         assert "<p>Quote text</p>" in result
+        assert "</blockquote>" in result
 
 
 class TestTables:

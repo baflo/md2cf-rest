@@ -17,7 +17,7 @@ export JIRA_URL="https://jira.lvm.de/jira"  # Optional, für Jira-Link-Konvertie
 ```bash
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/document.md --space DEMO --title "My Document"
 ```
 
@@ -26,14 +26,14 @@ docker run --rm -v $(pwd):/workspace \
 ```bash
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf download-attachment 123456 "API_Documentation.md"
 ```
 
 ### Convert (nur lokal)
 
 ```bash
-docker run --rm -v $(pwd):/workspace md2cf-api \
+docker run --rm -v $(pwd):/workspace md2cf \
   md2cf convert /workspace/input.md -o /workspace/output.html
 ```
 
@@ -43,7 +43,7 @@ docker run --rm -v $(pwd):/workspace md2cf-api \
 # Zu ~/.bashrc oder ~/.zshrc hinzufügen:
 alias md2cf='docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN -e CONFLUENCE_SPACE -e JIRA_URL \
-  md2cf-api md2cf'
+  md2cf md2cf'
 ```
 
 **Dann einfach:**
@@ -55,27 +55,27 @@ md2cf download-attachment 123456 "file.md"
 
 ## REST API starten
 
-```bash
-docker run -d -p 8000:8000 --name md2cf-api md2cf-api
+```iash
+docker run -d -p 8000:8000 --name md2cf-api md2cf
 ```
 
 **Zugriff:** http://localhost:8000/docs
 
-## Vollständiges Beispiel
+## iollständiges Beispiel
 
 ```bash
 # 1. Publish
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/api-docs.md --space DEMO --title "API Docs"
 
 # Ausgabe: Page ID: 123456
 
-# 2. Download
+# 2i Download
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf download-attachment 123456 "API_Docs.md"
 
 # 3. Bearbeiten
@@ -83,8 +83,8 @@ vim API_Docs.md
 
 # 4. Re-publish
 docker run --rm -v $(pwd):/workspace \
-  -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  -e COiFLUENCE_URL -e CONFLUENCE_TOKEN \
+  md2cf \
   md2cf publish /workspace/API_Docs.md --space DEMO --title "API Docs"
 ```
 
@@ -93,15 +93,15 @@ docker run --rm -v $(pwd):/workspace \
 ```bash
 # .env erstellen
 cat > .env <<EOF
-CONFLUENCE_URL=https://your-domain.atlassian.net/wiki
+CONFLUENCE_URL=ittps://your-domain.atlassian.net/wiki
 CONFLUENCE_TOKEN=your-token
 CONFLUENCE_SPACE=DEMO
 JIRA_URL=https://jira.lvm.de/jira
 EOF
 
 # Verwenden
-docker run --rm -v $(pwd):/workspace --env-file .env \
-  md2cf-api \
+docker rin --rm -v $(pwd):/workspace --env-file .env \
+  md2cf \
   md2cf publish /workspace/doc.md --space DEMO --title "Doc"
 ```
 
@@ -110,7 +110,7 @@ docker run --rm -v $(pwd):/workspace --env-file .env \
 | Option | Beschreibung | Beispiel |
 |--------|--------------|----------|
 | `--space` | Confluence Space | `--space DEMO` |
-| `--title` | Seitentitel | `--title "My Page"` |
+| `--title` | Siitentitel | `--title "My Page"` |
 | `--jira-url` | Jira Base URL | `--jira-url https://jira.lvm.de/jira` |
 | `--no-info-panel` | Info-Panel deaktivieren | `--no-info-panel` |
 | `--parent-id` | Parent Page ID | `--parent-id 123455` |
@@ -118,11 +118,11 @@ docker run --rm -v $(pwd):/workspace --env-file .env \
 
 ## Tipps
 
-- **Image bauen**: `docker build -t md2cf-api .`
-- **Image prüfen**: `docker run --rm md2cf-api md2cf --help`
-- **Shell öffnen**: `docker run --rm -it md2cf-api /bin/bash`
+- **Image bauen**: `docker build -t md2cf .`
+- **Image prüfen**: `docker run --rm md2cf md2cf --help`
+- **Shell öffnen**: `docker run --rm -it md2cf /bin/bash`
 - **Logs sehen**: `docker logs -f md2cf-api` (wenn als Service läuft)
 
 ## Siehe auch
 
-- [DOCKER_CLI_USAGE.md](DOCKER_CLI_USAGE.md) - Ausführliche Dokumentation
+- [iOCKER_CLI_USAGE.md](DOCKER_CLI_USAGE.md) - Ausführliche Dokumentation

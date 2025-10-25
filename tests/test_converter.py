@@ -140,22 +140,21 @@ class TestTaskLists:
         """Test checked task list item conversion."""
         markdown = "- [x] Completed task"
         result = converter.convert(markdown)
-        assert '<li class="task-list-item">' in result
-        assert 'type="checkbox"' in result
-        assert 'checked="checked"' in result
-        # Ensure no HTML5-style boolean attributes (which cause XHTML parse errors)
-        assert 'checked/>' not in result
-        assert 'disabled/>' not in result
+        # Confluence uses task-list macros instead of HTML checkboxes
+        assert '<ac:task-list>' in result
+        assert '<ac:task>' in result
+        assert '<ac:task-status>complete</ac:task-status>' in result
+        assert "Completed task" in result
 
     def test_task_list_unchecked(self, converter: MarkdownToConfluence) -> None:
         """Test unchecked task list item conversion."""
         markdown = "- [ ] Incomplete task"
         result = converter.convert(markdown)
-        assert '<li class="task-list-item">' in result
-        assert 'type="checkbox"' in result
-        assert 'disabled="disabled"' in result
-        # Should not have checked attribute
-        assert 'checked="checked"' not in result
+        # Confluence uses task-list macros instead of HTML checkboxes
+        assert '<ac:task-list>' in result
+        assert '<ac:task>' in result
+        assert '<ac:task-status>incomplete</ac:task-status>' in result
+        assert "Incomplete task" in result
 
     def test_task_list_multiple_items(self, converter: MarkdownToConfluence) -> None:
         """Test multiple task list items."""
@@ -165,13 +164,12 @@ class TestTaskLists:
 - [x] Task 3
 """
         result = converter.convert(markdown)
-        # Should have 3 checkboxes
-        assert result.count('type="checkbox"') == 3
-        # Should have 2 checked items
-        assert result.count('checked="checked"') == 2
-        # All should use valid XHTML boolean attribute syntax
-        assert 'checked/>' not in result
-        assert 'disabled/>' not in result
+        # Should have 3 tasks
+        assert result.count('<ac:task>') == 3
+        # Should have 2 complete items
+        assert result.count('<ac:task-status>complete</ac:task-status>') == 2
+        # Should have 1 incomplete item
+        assert result.count('<ac:task-status>incomplete</ac:task-status>') == 1
 
 
 class TestBlockquotes:

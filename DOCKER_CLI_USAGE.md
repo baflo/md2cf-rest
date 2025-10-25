@@ -25,7 +25,7 @@ export JIRA_URL="https://jira.lvm.de/jira"  # Optional, für Jira-Link-Konvertie
 Startet den Web-Server auf Port 8000:
 
 ```bash
-docker run -p 8000:8000 md2cf-api
+docker run -p 8000:8000 md2cf
 ```
 
 **Zugriff:**
@@ -42,7 +42,7 @@ docker run --rm \
   -v $(pwd):/workspace \
   -e CONFLUENCE_URL \
   -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/document.md --space DEMO --title "My Document"
 ```
 
@@ -60,7 +60,7 @@ docker run --rm \
   -v $(pwd):/workspace \
   -e CONFLUENCE_URL \
   -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/README.md --space DEMO --title "Documentation"
 
 # Mit Jira-Links (via Umgebungsvariable)
@@ -69,7 +69,7 @@ docker run --rm \
   -e CONFLUENCE_URL \
   -e CONFLUENCE_TOKEN \
   -e JIRA_URL \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/api-docs.md \
     --space DEMO \
     --title "API Documentation"
@@ -79,7 +79,7 @@ docker run --rm \
   -v $(pwd):/workspace \
   -e CONFLUENCE_URL \
   -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/api-docs.md \
     --space DEMO \
     --title "API Documentation" \
@@ -90,7 +90,7 @@ docker run --rm \
   -v $(pwd):/workspace \
   -e CONFLUENCE_URL \
   -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/doc.md \
     --space DEMO \
     --title "Document" \
@@ -105,7 +105,7 @@ docker run --rm \
   -v $(pwd):/workspace \
   -e CONFLUENCE_URL \
   -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf download-attachment 123456 "API_Documentation.md"
 
 # Das File wird nach /workspace/API_Documentation.md gespeichert
@@ -118,7 +118,7 @@ docker run --rm \
 # Nur konvertieren (ohne Publish)
 docker run --rm \
   -v $(pwd):/workspace \
-  md2cf-api \
+  md2cf \
   md2cf convert /workspace/input.md -o /workspace/output.html
 ```
 
@@ -132,7 +132,7 @@ version: '3.8'
 services:
   # REST API Service
   api:
-    image: md2cf-api
+    image: md2cf
     ports:
       - "8000:8000"
     environment:
@@ -146,7 +146,7 @@ services:
 
   # CLI Service (für manuelle Ausführung)
   cli:
-    image: md2cf-api
+    image: md2cf
     volumes:
       - ./documents:/workspace
     environment:
@@ -179,7 +179,7 @@ Füge zu deiner `~/.bashrc` oder `~/.zshrc` hinzu:
 # md2cf CLI via Docker
 alias md2cf-docker='docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN -e CONFLUENCE_SPACE -e JIRA_URL \
-  md2cf-api md2cf'
+  md2cf md2cf'
 ```
 
 **Dann einfach:**
@@ -212,7 +212,7 @@ source .env
 docker run --rm \
   -v $(pwd):/workspace \
   --env-file .env \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/api-docs.md --space DEMO --title "API Documentation"
 ```
 
@@ -229,7 +229,7 @@ URL: https://your-domain.atlassian.net/wiki/spaces/DEMO/pages/123456/API+Documen
 docker run --rm \
   -v $(pwd):/workspace \
   --env-file .env \
-  md2cf-api \
+  md2cf \
   md2cf download-attachment 123456 "API_Documentation.md"
 ```
 
@@ -252,7 +252,7 @@ vim ./API_Documentation.md
 docker run --rm \
   -v $(pwd):/workspace \
   --env-file .env \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/API_Documentation.md --space DEMO --title "API Documentation"
 ```
 
@@ -266,7 +266,7 @@ for file in *.md; do
   docker run --rm \
     -v $(pwd):/workspace \
     -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-    md2cf-api \
+    md2cf \
     md2cf publish "/workspace/$file" --space DEMO --title "${file%.md}"
 done
 ```
@@ -278,13 +278,13 @@ done
 docker network create md2cf-net
 
 # API starten
-docker run -d --name md2cf-api --network md2cf-net -p 8000:8000 md2cf-api
+docker run -d --name md2cf-api --network md2cf-net -p 8000:8000 md2cf
 
 # CLI verwenden
 docker run --rm --network md2cf-net \
   -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/doc.md --space DEMO --title "Doc"
 ```
 
@@ -295,14 +295,14 @@ docker run --rm --network md2cf-net \
 docker run --rm \
   -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/doc.md --space DEMO --title "Doc" -v
 
 # Shell im Container
 docker run --rm -it \
   -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   /bin/bash
 ```
 
@@ -323,7 +323,7 @@ docker run --rm -it \
 | Aspekt | REST API | CLI |
 |--------|----------|-----|
 | **Verwendung** | Web-Service | Einmalige Befehle |
-| **Start** | `docker run -p 8000:8000 md2cf-api` | `docker run md2cf-api md2cf ...` |
+| **Start** | `docker run -p 8000:8000 md2cf` | `docker run md2cf md2cf ...` |
 | **Zugriff** | HTTP Requests | Kommandozeile |
 | **Files** | Upload via HTTP | Mount via Volume |
 | **Auth** | In Request | Via Env Vars |
@@ -337,7 +337,7 @@ docker run --rm -it \
 
 **Lösung**: Stelle sicher, dass das Volume korrekt gemountet ist:
 ```bash
-docker run --rm -v $(pwd):/workspace md2cf-api ls -la /workspace
+docker run --rm -v $(pwd):/workspace md2cf ls -la /workspace
 ```
 
 ### "Confluence URL is required"

@@ -8,7 +8,7 @@ Das Docker Image unterstützt jetzt **zwei Modi**:
 
 **Start:**
 ```bash
-docker run -p 8000:8000 md2cf-api
+docker run -p 8000:8000 md2cf
 ```
 
 **Verwendung:**
@@ -22,7 +22,7 @@ docker run -p 8000:8000 md2cf-api
 ```bash
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/document.md --space DEMO --title "Title"
 ```
 
@@ -47,11 +47,11 @@ docker run --rm -v $(pwd):/workspace \
 
 ```bash
 # Keine Argumente oder "gunicorn" → REST API Modus
-docker run md2cf-api
+docker run md2cf
 # → Startet Gunicorn Web-Server
 
 # "md2cf" als erstes Argument → CLI Modus
-docker run md2cf-api md2cf publish ...
+docker run md2cf md2cf publish ...
 # → Führt CLI-Befehl aus
 ```
 
@@ -90,7 +90,7 @@ export CONFLUENCE_TOKEN="your-token"
 # 2. Publish
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/doc.md --space DEMO --title "Doc"
 ```
 
@@ -100,7 +100,7 @@ docker run --rm -v $(pwd):/workspace \
 # Zu ~/.bashrc hinzufügen:
 alias md2cf='docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN -e CONFLUENCE_SPACE \
-  md2cf-api md2cf'
+  md2cf md2cf'
 
 # Dann einfach:
 md2cf publish document.md --space DEMO --title "Title"
@@ -118,7 +118,7 @@ EOF
 
 # Verwenden
 docker run --rm -v $(pwd):/workspace --env-file .env \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/doc.md --space DEMO --title "Doc"
 ```
 
@@ -152,7 +152,7 @@ docker run --rm -v $(pwd):/workspace --env-file .env \
 
 ## 🔗 Nächste Schritte
 
-1. **Image bauen**: `docker build -t md2cf-api .`
+1. **Image bauen**: `docker build -t md2cf .`
 2. **Testen**: Siehe [DOCKER_CLI_QUICK_REFERENCE.md](DOCKER_CLI_QUICK_REFERENCE.md)
 3. **Alias erstellen**: Für einfachere Nutzung
 4. **Workflow einrichten**: Z.B. in CI/CD Pipeline

@@ -43,7 +43,7 @@ export CONFLUENCE_TOKEN="YOUR_PAT_TOKEN"
 # Dokument publizieren
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
-  md2cf-api \
+  md2cf \
   md2cf publish /workspace/README.md --space DEMO --title "Documentation"
 ```
 
