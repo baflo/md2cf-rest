@@ -3,42 +3,27 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Convert Markdown files to Confluence Storage Format and publish them directly to Confluence using the REST API with Personal Access Token (PAT) authentication.
+Konvertiere Markdown-Dateien zu Confluence Storage Format und publiziere sie direkt zu Confluence mit Personal Access Token (PAT) Authentifizierung.
 
 ## Features
 
-- **Custom Mistune Renderer**: Converts Markdown to Confluence Storage Format (XHTML)
-- **PAT Authentication**: Secure authentication using Personal Access Tokens
-- **Full Markdown Support**: Headings, lists, code blocks, tables, links, images, and more
-- **CLI Interface**: Easy-to-use command-line interface
-- **Python API**: Use as a library in your own projects
-- **Type Hints**: Fully typed with mypy support
-- **Comprehensive Tests**: Extensive test coverage with pytest
-
-## Installation
-
-### From Source
-
-```bash
-git clone https://github.com/yourusername/md2cf.git
-cd md2cf
-pip install -e .
-```
-
-### Development Installation
-
-```bash
-pip install -e ".[dev]"
-```
+- 🚀 **REST API & CLI**: Web-Service oder Command-Line Interface
+- 🔐 **PAT Authentication**: Sichere Authentifizierung mit Personal Access Tokens
+- 📝 **Full Markdown Support**: Headings, Lists, Code Blocks, Tables, Links, Images, Task Lists
+- 🔄 **Frontmatter Workflow**: Download → Edit → Re-publish mit automatischem Versioning
+- 🐳 **Docker Support**: Läuft out-of-the-box mit Docker
+- 🔗 **Jira Integration**: Automatische Konvertierung von Jira-Links zu Macros
+- 📎 **Attachments**: Upload von Bildern und Dateien
+- 🌳 **PlantUML Support**: Diagramme als Confluence Macros
 
 ## Quick Start
 
-### Option 1: Docker (Empfohlen)
+### Docker (Empfohlen)
 
 ```bash
 # Umgebungsvariablen setzen
-export CONFLUENCE_URL="https://yoursite.atlassian.net/wiki"
-export CONFLUENCE_TOKEN="YOUR_PAT_TOKEN"
+export CONFLUENCE_URL="https://your-domain.atlassian.net/wiki"
+export CONFLUENCE_TOKEN="your-personal-access-token"
 
 # Dokument publizieren
 docker run --rm -v $(pwd):/workspace \
@@ -47,405 +32,211 @@ docker run --rm -v $(pwd):/workspace \
   md2cf publish /workspace/README.md --space DEMO --title "Documentation"
 ```
 
-**Siehe auch:**
-- Linux/macOS: [DOCKER_CLI_QUICK_REFERENCE.md](DOCKER_CLI_QUICK_REFERENCE.md)
-- Windows PowerShell: [POWERSHELL_USAGE.md](POWERSHELL_USAGE.md)
+**Weitere Informationen:**
+- [Docker Usage Guide](docs/docker.md) - Umfassende Docker-Dokumentation
+- [REST API Dokumentation](docs/rest-api.md) - Web-Service nutzen
 
-### Option 2: Native Installation
-
-#### Convert Markdown to Confluence Format
+### Native Installation
 
 ```bash
-# Convert to stdout
-md2cf convert README.md
+# Installation
+pip install -e .
 
-# Convert and save to file
-md2cf convert README.md -o output.html
-```
-
-#### Publish to Confluence
-
-```bash
+# Publish
 md2cf publish README.md \
-  --url https://yoursite.atlassian.net \
+  --url https://your-domain.atlassian.net \
   --token YOUR_PAT_TOKEN \
   --space DEMO \
   --title "My Documentation"
+
+# Convert only
+md2cf convert README.md -o output.html
+
+# Download existing page
+md2cf download-source 123456
 ```
 
-## Usage
+## Frontmatter Workflow
 
-### Command-Line Interface
-
-#### Convert Command
-
-Convert Markdown files to Confluence Storage Format:
+md2cf unterstützt einen Round-Trip Workflow:
 
 ```bash
-# Basic conversion
-md2cf convert document.md
+# 1. Download: Lädt Seite mit Frontmatter herunter
+md2cf download-source 123456
+# Erstellt: My_Page_Title.md mit Metadaten (page_id, version, etc.)
 
-# Save to file
-md2cf convert document.md -o confluence.html
+# 2. Edit: Bearbeite Markdown lokal
+vim My_Page_Title.md
 
-# Verbose output
-md2cf convert document.md -v
+# 3. Re-publish: Automatisches Update mit korrekter Version
+md2cf publish My_Page_Title.md
+# Frontmatter wird automatisch aktualisiert
 ```
 
-#### Publish Command
+**Frontmatter Beispiel:**
+```yaml
+---
+confluence_page_id: "123456"
+confluence_space_key: "DEMO"
+confluence_title: "My Page"
+confluence_version: 5
+confluence_parent_id: "654321"
+---
+# My Page Content
 
-Publish Markdown files directly to Confluence:
+Your markdown here...
+```
+
+## REST API
+
+Starte den Web-Service:
 
 ```bash
-md2cf publish document.md \
-  --url https://yoursite.atlassian.net \
-  --token YOUR_PAT_TOKEN \
-  --space MYSPACE \
-  --title "Page Title"
+# Docker
+docker run -p 8000:8000 md2cf
+
+# Native
+uvicorn md2cf.rest_api:app --host 0.0.0.0 --port 8000
 ```
 
-**Options:**
+API Dokumentation: http://localhost:8000/docs
 
-- `--url`: Confluence base URL
-- `--token`: Personal Access Token
-- `--space`: Confluence space key
-- `--title`: Page title (optional, defaults to filename)
-- `--parent-id`: Parent page ID (optional)
-- `--cloud`: Use Confluence Cloud API (default)
-- `--server`: Use Confluence Server/Data Center API
-- `--no-verify-ssl`: Disable SSL certificate verification
+**Wichtige Endpoints:**
+- `POST /convert` - Konvertiere Markdown zu Confluence Format
+- `POST /publish` - Publiziere zu Confluence (mit Attachments)
+- `POST /spaces` - Liste verfügbare Spaces
+- `POST /search-pages` - Suche nach Pages
 
-### Python API
+Siehe [REST API Docs](docs/rest-api.md) für Details.
 
-#### Basic Conversion
+## Unterstützte Markdown Features
 
-```python
-from md2cf import MarkdownToConfluence
+| Feature | Markdown | Confluence Output |
+|---------|----------|-------------------|
+| **Bold** | `**text**` | `<strong>text</strong>` |
+| *Italic* | `*text*` | `<em>text</em>` |
+| Code | `` `code` `` | `<code>code</code>` |
+| Headings | `# H1` | `<h1>H1</h1>` |
+| Lists | `- item` | `<ul><li>item</li></ul>` |
+| Code Blocks | ` ```python ` | Confluence Code Macro |
+| Tables | Markdown Table | HTML Table |
+| Links | `[text](url)` | `<a href="url">text</a>` |
+| Images | `![alt](url)` | Confluence Image Macro |
+| Task Lists | `- [x] Done` | Confluence Task Macro |
+| Blockquotes | `> quote` | `<blockquote>` |
+| PlantUML | ` ```plantuml ` | Confluence PlantUML Macro |
+| Jira Links | `[PROJ-123](jira-url)` | Confluence Jira Macro |
 
-# Create converter
-converter = MarkdownToConfluence()
+## Umgebungsvariablen
 
-# Convert string
-markdown = "# Hello\n\nThis is **bold** text."
-confluence_html = converter.convert(markdown)
-print(confluence_html)
-
-# Convert file
-result = converter.convert_file("README.md")
-
-# Convert and save
-output_path = converter.convert_and_save("README.md", "output.html")
+```bash
+export CONFLUENCE_URL="https://your-domain.atlassian.net/wiki"
+export CONFLUENCE_TOKEN="your-personal-access-token"
+export CONFLUENCE_SPACE="DEMO"  # Optional: Default Space
+export JIRA_URL="https://jira.example.com"  # Optional: Jira Link Conversion
 ```
 
-#### Publish to Confluence
-
-```python
-from md2cf import MarkdownToConfluence
-from md2cf.api.confluence import ConfluenceClient
-
-# Convert Markdown
-converter = MarkdownToConfluence()
-content = converter.convert_file("documentation.md")
-
-# Initialize Confluence client
-client = ConfluenceClient(
-    url="https://yoursite.atlassian.net",
-    token="YOUR_PAT_TOKEN",
-    cloud=True,
-)
-
-# Create or update page
-page = client.create_or_update_page(
-    space="DEMO",
-    title="My Documentation",
-    body=content,
-)
-
-print(f"Page published: {client.get_page_url(page)}")
-```
-
-#### Advanced Usage
-
-```python
-from md2cf.api.confluence import ConfluenceClient
-
-client = ConfluenceClient(
-    url="https://yoursite.atlassian.net",
-    token="YOUR_PAT_TOKEN",
-)
-
-# Get existing page
-page = client.get_page_by_title("DEMO", "Existing Page")
-if page:
-    print(f"Page ID: {page['id']}")
-
-# Create page with parent
-page = client.create_page(
-    space="DEMO",
-    title="Child Page",
-    body="<p>Content</p>",
-    parent_id="123456",
-)
-
-# Update existing page
-client.update_page(
-    page_id="123456",
-    title="Updated Title",
-    body="<p>New content</p>",
-)
-
-# Delete page
-client.delete_page("123456")
-```
-
-## Supported Markdown Features
-
-### Text Formatting
-
-```markdown
-**bold text**
-*italic text*
-~~strikethrough~~
-`inline code`
-```
-
-### Headings
-
-```markdown
-# H1 Heading
-## H2 Heading
-### H3 Heading
-```
-
-### Lists
-
-```markdown
-- Unordered list item 1
-- Unordered list item 2
-
-1. Ordered list item 1
-2. Ordered list item 2
-```
-
-### Code Blocks
-
-````markdown
-```python
-def hello():
-    print("Hello, World!")
-```
-````
-
-### Links and Images
-
-```markdown
-[Link text](https://example.com)
-![Alt text](https://example.com/image.png)
-```
-
-### Tables
-
-```markdown
-| Header 1 | Header 2 |
-|----------|----------|
-| Cell 1   | Cell 2   |
-| Cell 3   | Cell 4   |
-```
-
-### Blockquotes
-
-```markdown
-> This is a quote
-```
-
-## Creating a Personal Access Token
+## Personal Access Token erstellen
 
 ### Confluence Cloud
 
-1. Log in to your Confluence Cloud instance
-2. Click on your profile picture → **Settings**
-3. Select **Personal Access Tokens**
-4. Click **Create token**
-5. Enter a name and expiration date
-6. Click **Create**
-7. Copy the token (you won't be able to see it again)
+1. Confluence → **Settings** → **Personal Access Tokens**
+2. **Create token**
+3. Name eingeben, Ablaufdatum wählen
+4. Token kopieren (wird nur einmal angezeigt!)
 
 ### Confluence Server/Data Center
 
-1. Log in to your Confluence instance
-2. Click on your profile picture → **Settings**
-3. Select **Personal Access Tokens** (may require admin privileges)
-4. Click **Create token**
-5. Copy the token
+1. Confluence → **Settings** → **Personal Access Tokens**
+2. **Create token** (Admin-Rechte erforderlich)
+3. Token kopieren
 
-## Environment Variables
+## Dokumentation
 
-You can use environment variables instead of command-line arguments:
-
-```bash
-export CONFLUENCE_URL="https://yoursite.atlassian.net"
-export CONFLUENCE_TOKEN="YOUR_PAT_TOKEN"
-export CONFLUENCE_SPACE="DEMO"
-export JIRA_URL="https://jira.lvm.de/jira"  # Optional, for Jira link conversion
-
-md2cf publish document.md
-```
-
-Supported environment variables:
-- `CONFLUENCE_URL` - Confluence base URL
-- `CONFLUENCE_TOKEN` - Personal Access Token
-- `CONFLUENCE_SPACE` - Default space key (optional)
-- `JIRA_URL` - Jira base URL for automatic Jira ticket link conversion (optional)
+- 📚 [Quick Start Guide](docs/quickstart.md) - Schnelleinstieg
+- 🐳 [Docker Usage](docs/docker.md) - Docker CLI & Compose
+- 🌐 [REST API](docs/rest-api.md) - Web Service API
+- 🧪 [Testing Guide](docs/testing.md) - Tests ausführen
+- 🤝 [Contributing](docs/contributing.md) - Beitragen zum Projekt
 
 ## Development
 
-### Setup Development Environment
-
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/md2cf.git
-cd md2cf
-
-# Install in development mode
+# Installation
 pip install -e ".[dev]"
-```
 
-### Run Tests
-
-```bash
-# Run all tests
+# Tests ausführen
 pytest
 
-# Run with coverage
+# Mit Coverage
 pytest --cov=md2cf --cov-report=html
 
-# Run specific test file
-pytest tests/test_converter.py
-
-# Run with verbose output
-pytest -v
-```
-
-### Code Quality
-
-```bash
-# Format code with black
+# Code formatieren
 black md2cf tests
-
-# Sort imports with isort
 isort md2cf tests
 
-# Type checking with mypy
+# Type checking
 mypy md2cf
+```
 
-# Lint with ruff
-ruff check md2cf tests
+Siehe [Testing Guide](docs/testing.md) für Details.
+
+## Troubleshooting
+
+### Authentication Errors
+
+```bash
+# PAT überprüfen
+echo $CONFLUENCE_TOKEN
+
+# Permissions testen
+md2cf publish test.md --space DEMO --title "Test"
+```
+
+### SSL Certificate Errors
+
+```bash
+md2cf publish document.md --no-verify-ssl
+```
+
+### Version Conflicts
+
+```bash
+# Download aktuelle Version
+md2cf download-source 123456
+
+# Bearbeiten und re-publish
+md2cf publish Downloaded_Page.md
 ```
 
 ## Project Structure
 
 ```
 md2cf/
-├── md2cf/
-│   ├── __init__.py
-│   ├── converter.py          # Main converter class
-│   ├── cli.py                # Command-line interface
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── confluence.py     # Confluence API client
-│   ├── renderers/
-│   │   ├── __init__.py
-│   │   └── confluence.py     # Confluence renderer
-│   └── utils/
-│       └── __init__.py
-├── tests/
-│   ├── __init__.py
-│   ├── conftest.py
-│   ├── test_renderer.py
-│   ├── test_converter.py
-│   └── test_confluence_api.py
-├── examples/
-│   └── sample.md
-├── pyproject.toml
-├── README.md
-└── .gitignore
+├── md2cf/                    # Source code
+│   ├── api/                  # Confluence API client
+│   ├── renderers/            # Confluence renderer
+│   ├── utils/                # Utilities (frontmatter)
+│   ├── cli.py                # CLI interface
+│   ├── converter.py          # Markdown converter
+│   └── rest_api.py           # REST API
+├── tests/                    # Test suite (149 tests, 77% coverage)
+├── docs/                     # Documentation
+├── examples/                 # Example files
+├── Dockerfile                # Docker image
+└── pyproject.toml            # Project configuration
 ```
-
-## Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Guidelines
-
-- Follow PEP 8 style guidelines
-- Add type hints to all functions
-- Write tests for new features
-- Update documentation as needed
-- Run tests and linting before submitting
-
-## Troubleshooting
-
-### Authentication Errors
-
-If you receive authentication errors:
-
-1. Verify your PAT is correct and not expired
-2. Check that your PAT has the necessary permissions
-3. Ensure you're using the correct Confluence URL
-
-### SSL Certificate Errors
-
-If you encounter SSL certificate errors:
-
-```bash
-md2cf publish document.md --no-verify-ssl \
-  --url https://yoursite.atlassian.net \
-  --token YOUR_TOKEN --space DEMO
-```
-
-### Page Not Found
-
-If the space or page is not found:
-
-1. Verify the space key is correct (case-sensitive)
-2. Ensure you have access to the space
-3. Check that the page title is exact (for updates)
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - siehe LICENSE file für Details.
 
 ## Acknowledgments
 
-- [Mistune](https://github.com/lepture/mistune) - Fast Markdown parser
-- [atlassian-python-api](https://github.com/atlassian-api/atlassian-python-api) - Atlassian API wrapper
-
-## Changelog
-
-### Version 0.1.0 (Initial Release)
-
-- Markdown to Confluence Storage Format conversion
-- PAT authentication support
-- CLI interface for convert and publish commands
-- Python API for programmatic usage
-- Comprehensive test suite
-- Full type hints support
-
-## Support
-
-For bugs and feature requests, please [open an issue](https://github.com/yourusername/md2cf/issues).
-
-## Related Projects
-
-- [mark](https://github.com/kovetskiy/mark) - Go-based Markdown to Confluence converter
-- [confluence-publisher](https://github.com/confluence-publisher/confluence-publisher) - Java-based publisher
+- [Mistune](https://github.com/lepture/mistune) - Markdown Parser
+- [FastAPI](https://fastapi.tiangolo.com/) - Web Framework
+- [atlassian-python-api](https://github.com/atlassian-api/atlassian-python-api) - Atlassian API
 
 ---
 
-Made with Python and Mistune
+**Made with ❤️ using Python, Mistune & FastAPI**
