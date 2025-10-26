@@ -222,7 +222,7 @@ class MarkdownToConfluence:
             # Create CLI example (simplified - assumes env vars are set)
             cli_example = (
                 f'# Download:<br/>'
-                f'md2cf download-attachment {page_id_value} "{filename_escaped}"<br/><br/>'
+                f'md2cf source {page_id_value}<br/><br/>'
                 f'# Nach Änderungen re-publish:<br/>'
                 f'md2cf publish ./{filename_escaped} --space {space_key_value} --title "{title_value}"'
             )
