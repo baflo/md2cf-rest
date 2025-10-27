@@ -23,13 +23,20 @@ Konvertiere Markdown-Dateien zu Confluence Storage Format und publiziere sie dir
 ```bash
 # Umgebungsvariablen setzen
 export CONFLUENCE_URL="https://your-domain.atlassian.net/wiki"
+export JIRA_URL="https://jira.example.com"  # Optional: Jira Link Conversion
 export CONFLUENCE_TOKEN="your-personal-access-token"
 
 # Dokument publizieren
 docker run --rm -v $(pwd):/workspace \
+  -e CONFLUENCE_URL -e CONFLUENCE_TOKEN -e JIRA_URL \
+  md2cf \
+  publish /workspace/README.md --space DEMO --title "Documentation"
+
+# REST API starten
+docker run -p 8000:8000 \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
   md2cf \
-  md2cf publish /workspace/README.md --space DEMO --title "Documentation"
+  api
 ```
 
 **Weitere Informationen:**
@@ -52,8 +59,11 @@ md2cf publish README.md \
 # Convert only
 md2cf convert README.md -o output.html
 
-# Download existing page
+# Download existing page (by ID)
 md2cf download-source 123456
+
+# Download existing page (by URL)
+md2cf download-source "https://your-domain.atlassian.net/wiki/spaces/DEMO/pages/123456/Title"
 ```
 
 ## Frontmatter Workflow
@@ -61,17 +71,27 @@ md2cf download-source 123456
 md2cf unterstützt einen Round-Trip Workflow:
 
 ```bash
-# 1. Download: Lädt Seite mit Frontmatter herunter
+# 1. Download: Lädt Seite mit Frontmatter herunter (per ID oder URL)
 md2cf download-source 123456
+# oder
+md2cf download-source "https://your-domain.atlassian.net/wiki/spaces/DEMO/pages/123456/Title"
 # Erstellt: My_Page_Title.md mit Metadaten (page_id, version, etc.)
+
+# Alternative: Update prüfen (lädt nur herunter wenn Remote neuer ist)
+md2cf update-source My_Page_Title.md
 
 # 2. Edit: Bearbeite Markdown lokal
 vim My_Page_Title.md
 
 # 3. Re-publish: Automatisches Update mit korrekter Version
 md2cf publish My_Page_Title.md
-# Frontmatter wird automatisch aktualisiert
+# Frontmatter wird automatisch auf die neuen Remote-Daten (z.B. Version) aktualisiert
 ```
+
+**Wichtige Befehle:**
+- `download-source <page-id>` - Lädt eine Seite erstmalig herunter
+- `update-source <file.md>` - Aktualisiert lokale Datei, nur wenn Remote neuer ist
+- `publish <file.md>` - Publiziert lokale Änderungen zu Confluence
 
 **Frontmatter Beispiel:**
 ```yaml
@@ -93,9 +113,15 @@ Starte den Web-Service:
 
 ```bash
 # Docker
-docker run -p 8000:8000 md2cf
+docker run -p 8000:8000 md2cf api
 
-# Native
+# Docker mit benutzerdefinierten Einstellungen
+docker run -p 8080:8080 md2cf api --port 8080 --workers 8
+
+# Native (via CLI)
+md2cf api
+
+# Native (direkt mit uvicorn)
 uvicorn md2cf.rest_api:app --host 0.0.0.0 --port 8000
 ```
 

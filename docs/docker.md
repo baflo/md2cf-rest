@@ -1,17 +1,20 @@
 # Docker Usage
 
-Das md2cf Docker Image unterstützt zwei Modi: **REST API Server** und **CLI Commands**.
+Das md2cf Docker Image unterstützt alle CLI-Befehle über den `md2cf` Befehl.
 
 ## Quick Start
 
-### REST API Server (Standard)
+### REST API Server
 
 ```bash
 # Server starten
-docker run -p 8000:8000 md2cf
+docker run -p 8000:8000 md2cf api
 
 # API Dokumentation aufrufen
 open http://localhost:8000/docs
+
+# Mit benutzerdefinierten Einstellungen
+docker run -p 8080:8080 md2cf api --port 8080 --workers 8 --log-level debug
 ```
 
 ### CLI Commands
@@ -25,7 +28,7 @@ export CONFLUENCE_TOKEN="your-personal-access-token"
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
   md2cf \
-  md2cf publish /workspace/README.md --space DEMO --title "Documentation"
+  publish /workspace/README.md --space DEMO --title "Documentation"
 ```
 
 ## Linux/macOS CLI
@@ -47,7 +50,7 @@ export JIRA_URL="https://jira.example.com"  # Optional
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
   md2cf \
-  md2cf publish /workspace/README.md --space DEMO --title "My Page"
+  publish /workspace/README.md --space DEMO --title "My Page"
 ```
 
 #### Mit Parent Page
@@ -56,7 +59,7 @@ docker run --rm -v $(pwd):/workspace \
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
   md2cf \
-  md2cf publish /workspace/README.md \
+  publish /workspace/README.md \
     --space DEMO \
     --title "Child Page" \
     --parent-id 123456
@@ -68,7 +71,7 @@ docker run --rm -v $(pwd):/workspace \
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
   md2cf \
-  md2cf download-source 123456
+  download-source 123456
 ```
 
 #### Convert Only
@@ -76,7 +79,7 @@ docker run --rm -v $(pwd):/workspace \
 ```bash
 docker run --rm -v $(pwd):/workspace \
   md2cf \
-  md2cf convert /workspace/input.md -o /workspace/output.html
+  convert /workspace/input.md -o /workspace/output.html
 ```
 
 ### Helper Funktion (Optional)
@@ -88,7 +91,7 @@ md2cf() {
     docker run --rm -v $(pwd):/workspace \
       -e CONFLUENCE_URL -e CONFLUENCE_TOKEN -e CONFLUENCE_SPACE -e JIRA_URL \
       md2cf \
-      md2cf "$@"
+      "$@"
 }
 ```
 
@@ -97,6 +100,7 @@ Danach können Sie direkt nutzen:
 ```bash
 md2cf publish README.md --space DEMO --title "My Doc"
 md2cf download-source 123456
+md2cf api  # API Server starten
 ```
 
 ## Windows PowerShell
@@ -116,9 +120,9 @@ $env:JIRA_URL = "https://jira.example.com"  # Optional
 
 ```powershell
 docker run --rm -v ${PWD}:/workspace `
-  -e CONFLUENCE_URL -e CONFLUENCE_TOKEN `
+  -e "CONFLUENCE_URL=${env:CONFLUENCE_URL}" -e "CONFLUENCE_TOKEN=${env:CONFLUENCE_TOKEN}" `
   md2cf `
-  md2cf publish /workspace/README.md --space DEMO --title "My Page"
+  publish README.md --space DEMO --title "My Page"
 ```
 
 #### Download Source
@@ -127,7 +131,7 @@ docker run --rm -v ${PWD}:/workspace `
 docker run --rm -v ${PWD}:/workspace `
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN `
   md2cf `
-  md2cf download-source 123456
+  download-source 123456
 ```
 
 ### PowerShell Funktion (Optional)
@@ -136,14 +140,13 @@ Füge zu Ihrem PowerShell Profil hinzu (`$PROFILE`):
 
 ```powershell
 function md2cf {
-    $mdArgs = $args -join ' '
     docker run --rm -v ${PWD}:/workspace `
       -e CONFLUENCE_URL=$env:CONFLUENCE_URL `
       -e CONFLUENCE_TOKEN=$env:CONFLUENCE_TOKEN `
       -e CONFLUENCE_SPACE=$env:CONFLUENCE_SPACE `
       -e JIRA_URL=$env:JIRA_URL `
       md2cf `
-      md2cf $mdArgs
+      $args
 }
 ```
 
@@ -152,6 +155,7 @@ Danach können Sie direkt nutzen:
 ```powershell
 md2cf publish README.md --space DEMO --title "My Doc"
 md2cf download-source 123456
+md2cf api  # API Server starten
 ```
 
 ## Docker Compose
@@ -164,17 +168,29 @@ version: '3.8'
 services:
   api:
     image: md2cf:latest
+    command: api
     ports:
       - "8000:8000"
     environment:
-      - LOG_LEVEL=INFO
+      - CONFLUENCE_URL=https://your-domain.atlassian.net/wiki
+      - CONFLUENCE_TOKEN=${CONFLUENCE_TOKEN}
+      - PORT=8000
+      - WORKERS=4
+      - LOG_LEVEL=info
     restart: unless-stopped
 ```
 
 ### Starten
 
 ```bash
-docker-compose up -d
+# Production starten
+docker compose --profile production up -d
+
+# Development starten
+docker compose --profile dev up
+
+# Logs anzeigen
+docker compose logs -f api
 ```
 
 ## Image bauen
@@ -197,20 +213,20 @@ DOCKER_BUILDKIT=1 docker build -t md2cf:latest .
 **Linux/macOS:**
 ```bash
 # Stelle sicher, dass der absolute Pfad verwendet wird
-docker run --rm -v $(pwd):/workspace md2cf md2cf publish /workspace/file.md
+docker run --rm -v $(pwd):/workspace md2cf publish /workspace/file.md
 ```
 
 **Windows PowerShell:**
 ```powershell
 # Verwende ${PWD} statt $(pwd)
-docker run --rm -v ${PWD}:/workspace md2cf md2cf publish /workspace/file.md
+docker run --rm -v ${PWD}:/workspace md2cf publish /workspace/file.md
 ```
 
 ### Permission Denied
 
 ```bash
 # Führe mit User-ID aus
-docker run --rm --user $(id -u):$(id -g) -v $(pwd):/workspace md2cf md2cf convert /workspace/file.md
+docker run --rm --user $(id -u):$(id -g) -v $(pwd):/workspace md2cf convert /workspace/file.md
 ```
 
 ### SSL Certificate Errors
@@ -219,5 +235,5 @@ docker run --rm --user $(id -u):$(id -g) -v $(pwd):/workspace md2cf md2cf conver
 docker run --rm -v $(pwd):/workspace \
   -e CONFLUENCE_URL -e CONFLUENCE_TOKEN \
   md2cf \
-  md2cf publish /workspace/file.md --no-verify-ssl
+  publish /workspace/file.md --no-verify-ssl
 ```

@@ -8,9 +8,12 @@ services:
       dockerfile: Dockerfile
     image: md2cf:latest
     container_name: md2cf-api
+    command: api
     ports:
       - "8000:8000"
     environment:
+      - PORT=8000
+      - WORKERS=4
       - LOG_LEVEL=info
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -29,6 +32,7 @@ services:
       dockerfile: Dockerfile
     image: md2cf:latest
     container_name: md2cf-api-dev
+    command: api --log-level debug
     ports:
       - "8000:8000"
       - "5678:5678"  # Debugger port
@@ -37,9 +41,10 @@ services:
       - ./examples:/app/examples
       - ./scripts:/app/scripts
     environment:
+      - PORT=8000
+      - WORKERS=2
       - LOG_LEVEL=debug
       - PYTHONUNBUFFERED=1
-    # command: uvicorn md2cf.rest_api:app --host 0.0.0.0 --port 8000 --reload
     profiles:
       - dev
 

@@ -2,26 +2,23 @@
 set -e
 
 # Docker entrypoint script for md2cf
-# Supports both REST API mode and CLI mode
+# All commands are now handled through the md2cf CLI
 
-# If no arguments or first argument is a known server command, start REST API
-if [ $# -eq 0 ] || [ "$1" = "gunicorn" ] || [ "$1" = "uvicorn" ]; then
-    echo "Starting md2cf REST API server..."
-    exec gunicorn md2cf.rest_api:app \
-        --workers "${WORKERS:-4}" \
-        --worker-class uvicorn.workers.UvicornWorker \
-        --bind "0.0.0.0:${PORT:-8000}" \
-        --access-logfile - \
-        --error-logfile - \
-        --log-level "${LOG_LEVEL:-info}"
+# If no arguments provided, show help
+if [ $# -eq 0 ]; then
+    exec md2cf --help
 fi
 
-# If first argument is "md2cf", run CLI command
+# If first argument doesn't start with a dash and is not "md2cf", prepend "md2cf"
+if [[ "$1" != -* ]] && [ "$1" != "md2cf" ]; then
+    # Arguments like "api", "publish", "convert", etc.
+    exec md2cf "$@"
+fi
+
+# If first argument is "md2cf", execute as-is
 if [ "$1" = "md2cf" ]; then
-    echo "Running md2cf CLI command: $*"
     exec "$@"
 fi
 
-# Otherwise, execute the command as-is
-echo "Executing command: $*"
-exec "$@"
+# For arguments starting with dash (like --help), pass to md2cf
+exec md2cf "$@"

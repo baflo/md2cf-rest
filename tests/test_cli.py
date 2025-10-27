@@ -11,6 +11,7 @@ from md2cf.cli import (
     publish_command,
     download_attachment_command,
     download_source_command,
+    update_source_command,
     create_parser,
     main,
 )
@@ -331,6 +332,171 @@ class TestDownloadSourceCommand:
         assert result == 0
         mock_client.get_page_by_id.assert_called_once()
         mock_client.download_attachment.assert_called_once()
+
+
+class TestUpdateSourceCommand:
+    """Test update-source command."""
+
+    @patch('md2cf.cli.ConfluenceClient')
+    def test_update_with_newer_remote_version(self, mock_client_class, temp_markdown_file):
+        """Test updating local file when remote version is newer."""
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        # Remote version (7) is newer than local (5)
+        mock_client.get_page_by_id.return_value = {
+            "id": "123456",
+            "title": "Test Page",
+            "space": {"key": "DEMO"},
+            "version": {"number": 7},
+            "ancestors": [],
+        }
+
+        # Mock download_attachment to write updated content to temp file
+        def mock_download(page_id, filename, output_path):
+            with open(output_path, 'w') as f:
+                f.write("# Updated Content")
+            return output_path
+
+        mock_client.download_attachment.side_effect = mock_download
+
+        args = MagicMock()
+        args.input = temp_markdown_file
+        args.url = "https://example.atlassian.net"
+        args.token = "test-token"
+        args.cloud = True
+        args.no_verify_ssl = False
+
+        result = update_source_command(args)
+
+        assert result == 0
+        mock_client.download_attachment.assert_called_once()
+
+        # Verify file was updated
+        with open(temp_markdown_file, 'r') as f:
+            content = f.read()
+            assert "confluence_version: 7" in content
+
+    @patch('md2cf.cli.ConfluenceClient')
+    def test_update_with_same_version(self, mock_client_class, temp_markdown_file, capsys):
+        """Test that file is not updated when versions are the same."""
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        # Remote version (5) equals local version (5)
+        mock_client.get_page_by_id.return_value = {
+            "id": "123456",
+            "title": "Test Page",
+            "space": {"key": "DEMO"},
+            "version": {"number": 5},
+            "ancestors": [],
+        }
+
+        args = MagicMock()
+        args.input = temp_markdown_file
+        args.url = "https://example.atlassian.net"
+        args.token = "test-token"
+        args.cloud = True
+        args.no_verify_ssl = False
+
+        result = update_source_command(args)
+
+        assert result == 0
+        mock_client.download_attachment.assert_not_called()
+
+        captured = capsys.readouterr()
+        assert "already up-to-date" in captured.out
+
+    @patch('md2cf.cli.ConfluenceClient')
+    def test_update_with_older_remote_version(self, mock_client_class, temp_markdown_file, capsys):
+        """Test that file is not updated when remote version is older."""
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        # Remote version (3) is older than local version (5)
+        mock_client.get_page_by_id.return_value = {
+            "id": "123456",
+            "title": "Test Page",
+            "space": {"key": "DEMO"},
+            "version": {"number": 3},
+            "ancestors": [],
+        }
+
+        args = MagicMock()
+        args.input = temp_markdown_file
+        args.url = "https://example.atlassian.net"
+        args.token = "test-token"
+        args.cloud = True
+        args.no_verify_ssl = False
+
+        result = update_source_command(args)
+
+        assert result == 0
+        mock_client.download_attachment.assert_not_called()
+
+        captured = capsys.readouterr()
+        assert "already up-to-date" in captured.out
+
+    def test_update_without_frontmatter(self):
+        """Test update-source with file missing frontmatter."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+            f.write("# Test Content\n\nNo frontmatter here.")
+            temp_path = f.name
+
+        try:
+            args = MagicMock()
+            args.input = temp_path
+            args.url = "https://example.atlassian.net"
+            args.token = "test-token"
+            args.cloud = True
+            args.no_verify_ssl = False
+
+            result = update_source_command(args)
+
+            # Should fail due to missing page_id in frontmatter
+            assert result == 1
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+    def test_update_nonexistent_file(self):
+        """Test update-source with non-existent file."""
+        args = MagicMock()
+        args.input = "/nonexistent/file.md"
+        args.url = "https://example.atlassian.net"
+        args.token = "test-token"
+        args.cloud = True
+        args.no_verify_ssl = False
+
+        result = update_source_command(args)
+
+        # Should fail due to file not found
+        assert result == 1
+
+    def test_update_missing_url(self, temp_markdown_file):
+        """Test update-source without URL."""
+        args = MagicMock()
+        args.input = temp_markdown_file
+        args.url = None
+        args.token = "test-token"
+        args.cloud = True
+        args.no_verify_ssl = False
+
+        result = update_source_command(args)
+
+        assert result == 1
+
+    def test_update_missing_token(self, temp_markdown_file):
+        """Test update-source without token."""
+        args = MagicMock()
+        args.input = temp_markdown_file
+        args.url = "https://example.atlassian.net"
+        args.token = None
+        args.cloud = True
+        args.no_verify_ssl = False
+
+        result = update_source_command(args)
+
+        assert result == 1
 
 
 class TestCreateParser:

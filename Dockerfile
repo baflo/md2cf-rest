@@ -91,5 +91,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
-# Default command: Start REST API server
-CMD []
+# Default command: Show help (use 'api' to start REST API server)
+CMD ["--help"]

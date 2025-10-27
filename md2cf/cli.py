@@ -15,6 +15,7 @@ from typing import Optional
 from md2cf.api.confluence import ConfluenceClient
 from md2cf.converter import MarkdownToConfluence
 from md2cf.utils.frontmatter import FrontmatterMetadata, add_frontmatter, parse_frontmatter_metadata
+from md2cf.utils.url_parser import extract_page_id_from_url
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -30,6 +31,54 @@ def setup_logging(verbose: bool = False) -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+
+
+def api_command(args: argparse.Namespace) -> int:
+    """
+    Handle the api command - start the REST API server.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        import os
+        import subprocess
+
+        # Get configuration from arguments or environment
+        host = args.host if hasattr(args, 'host') else os.environ.get('HOST', '0.0.0.0')
+        port = args.port if hasattr(args, 'port') else int(os.environ.get('PORT', '8000'))
+        workers = args.workers if hasattr(args, 'workers') else int(os.environ.get('WORKERS', '4'))
+        log_level = args.log_level if hasattr(args, 'log_level') else os.environ.get('LOG_LEVEL', 'info')
+
+        print(f"Starting md2cf REST API server on {host}:{port}")
+        print(f"Workers: {workers}, Log level: {log_level}")
+        print(f"API documentation: http://{host if host != '0.0.0.0' else 'localhost'}:{port}/docs")
+
+        # Start gunicorn with uvicorn workers
+        cmd = [
+            'gunicorn',
+            'md2cf.rest_api:app',
+            '--workers', str(workers),
+            '--worker-class', 'uvicorn.workers.UvicornWorker',
+            '--bind', f'{host}:{port}',
+            '--access-logfile', '-',
+            '--error-logfile', '-',
+            '--log-level', log_level,
+        ]
+
+        # Execute gunicorn
+        result = subprocess.run(cmd)
+        return result.returncode
+
+    except KeyboardInterrupt:
+        print("\nShutting down API server...")
+        return 0
+    except Exception as e:
+        logging.error(f"Failed to start API server: {e}")
+        return 1
 
 
 def convert_command(args: argparse.Namespace) -> int:
@@ -79,6 +128,13 @@ def download_attachment_command(args: argparse.Namespace) -> int:
             logging.error("Confluence token is required (use --token or set CONFLUENCE_TOKEN env var)")
             return 1
 
+        # Extract page ID from URL if necessary
+        try:
+            page_id = extract_page_id_from_url(args.page_id)
+        except ValueError as e:
+            logging.error(f"Invalid page ID or URL: {e}")
+            return 1
+
         # Initialize Confluence client
         client = ConfluenceClient(
             url=args.url,
@@ -92,7 +148,7 @@ def download_attachment_command(args: argparse.Namespace) -> int:
 
         # Download the attachment
         downloaded_path = client.download_attachment(
-            page_id=args.page_id,
+            page_id=page_id,
             filename=args.filename,
             output_path=output_path,
         )
@@ -104,6 +160,141 @@ def download_attachment_command(args: argparse.Namespace) -> int:
         return 0
     except Exception as e:
         logging.error(f"Download failed: {e}")
+        return 1
+
+
+def update_source_command(args: argparse.Namespace) -> int:
+    """
+    Handle the update-source command.
+
+    Updates a local Markdown file with the latest version from Confluence,
+    but only if the remote version is newer than the local version.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        input_path = Path(args.input)
+
+        # Check if file exists
+        if not input_path.exists():
+            logging.error(f"File not found: {input_path}")
+            return 1
+
+        # Read the local file
+        with open(input_path, 'r', encoding='utf-8') as f:
+            local_content = f.read()
+
+        # Parse frontmatter to get page ID and version
+        frontmatter_meta, markdown_content = parse_frontmatter_metadata(local_content)
+
+        if not frontmatter_meta.page_id:
+            logging.error(f"No page ID found in frontmatter of {input_path}")
+            logging.error("File must have been downloaded with 'download-source' and contain frontmatter metadata")
+            return 1
+
+        local_version = frontmatter_meta.version or 0
+
+        # Validate required arguments
+        if not args.url:
+            logging.error("Confluence URL is required (use --url or set CONFLUENCE_URL env var)")
+            return 1
+        if not args.token:
+            logging.error("Confluence token is required (use --token or set CONFLUENCE_TOKEN env var)")
+            return 1
+
+        # Initialize Confluence client
+        client = ConfluenceClient(
+            url=args.url,
+            token=args.token,
+            cloud=args.cloud,
+            verify_ssl=not args.no_verify_ssl,
+        )
+
+        # Get remote page details
+        page = client.get_page_by_id(frontmatter_meta.page_id, expand="version,space,ancestors")
+
+        if not page:
+            logging.error(f"Page with ID '{frontmatter_meta.page_id}' not found on Confluence")
+            return 1
+
+        remote_version = page['version']['number']
+
+        # Check if remote is newer
+        if remote_version <= local_version:
+            print(f"Local file is already up-to-date")
+            print(f"Local version:  {local_version}")
+            print(f"Remote version: {remote_version}")
+            print(f"File: {input_path}")
+            return 0
+
+        print(f"Remote version is newer, updating local file...")
+        print(f"Local version:  {local_version}")
+        print(f"Remote version: {remote_version}")
+
+        # Determine the markdown attachment filename from page title
+        import re
+        safe_title = re.sub(r'[<>:"/\\|?*]', '_', page['title'])
+        safe_title = re.sub(r'[_\s]+', '_', safe_title)
+        safe_title = safe_title.strip('_')
+        markdown_filename = f"{safe_title}.md"
+
+        # Create temporary file for download
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.md', delete=False) as tmp_file:
+            temp_path = tmp_file.name
+
+        try:
+            # Download the markdown attachment to temp file
+            client.download_attachment(
+                page_id=frontmatter_meta.page_id,
+                filename=markdown_filename,
+                output_path=temp_path,
+            )
+
+            # Read the downloaded content
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                downloaded_content = f.read()
+
+            # Extract parent ID if available
+            ancestors = page.get('ancestors', [])
+            parent_id = ancestors[-1]['id'] if ancestors else None
+
+            # Create updated frontmatter metadata
+            updated_metadata = FrontmatterMetadata(
+                page_id=page['id'],
+                space_key=page['space']['key'],
+                title=page['title'],
+                version=remote_version,
+                parent_id=parent_id,
+            )
+
+            # Add frontmatter to downloaded content
+            markdown_with_frontmatter = add_frontmatter(downloaded_content, updated_metadata)
+
+            # Write to original file
+            with open(input_path, 'w', encoding='utf-8') as f:
+                f.write(markdown_with_frontmatter)
+
+            print(f"Successfully updated local file")
+            print(f"File: {input_path}")
+            print(f"New version: {remote_version}")
+            print(f"Page ID: {page['id']}")
+            print(f"Space: {page['space']['key']}")
+
+            return 0
+
+        finally:
+            # Clean up temp file
+            import os
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    except Exception as e:
+        logging.error(f"Update failed: {e}")
         return 1
 
 
@@ -129,6 +320,13 @@ def download_source_command(args: argparse.Namespace) -> int:
             logging.error("Confluence token is required (use --token or set CONFLUENCE_TOKEN env var)")
             return 1
 
+        # Extract page ID from URL if necessary
+        try:
+            page_id = extract_page_id_from_url(args.page_id)
+        except ValueError as e:
+            logging.error(f"Invalid page ID or URL: {e}")
+            return 1
+
         # Initialize Confluence client
         client = ConfluenceClient(
             url=args.url,
@@ -138,10 +336,10 @@ def download_source_command(args: argparse.Namespace) -> int:
         )
 
         # Get page details to extract metadata
-        page = client.get_page_by_id(args.page_id, expand="version,space,ancestors")
+        page = client.get_page_by_id(page_id, expand="version,space,ancestors")
 
         if not page:
-            logging.error(f"Page with ID '{args.page_id}' not found")
+            logging.error(f"Page with ID '{page_id}' not found")
             return 1
 
         # Determine the markdown attachment filename from page title
@@ -159,7 +357,7 @@ def download_source_command(args: argparse.Namespace) -> int:
 
         # Download the markdown attachment
         downloaded_path = client.download_attachment(
-            page_id=args.page_id,
+            page_id=page_id,
             filename=markdown_filename,
             output_path=output_path,
         )
@@ -224,7 +422,15 @@ def publish_command(args: argparse.Namespace) -> int:
         # Use frontmatter as defaults, CLI args override
         space = args.space or frontmatter_meta.space_key
         title = args.title or frontmatter_meta.title
+
+        # Extract page ID from parent_id if it's a URL
         parent_id = args.parent_id or frontmatter_meta.parent_id
+        if parent_id:
+            try:
+                parent_id = extract_page_id_from_url(parent_id)
+            except ValueError as e:
+                logging.error(f"Invalid parent page ID or URL: {e}")
+                return 1
 
         # Validate required arguments (after frontmatter defaults)
         if not args.url:
@@ -476,6 +682,12 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Start the REST API server
+  md2cf api
+
+  # Start API server with custom settings
+  md2cf api --host 0.0.0.0 --port 8000 --workers 4 --log-level info
+
   # Convert a Markdown file to Confluence format
   md2cf convert README.md
 
@@ -491,17 +703,29 @@ Examples:
       --token YOUR_PAT_TOKEN --space DEMO --title "API Documentation" \\
       --parent-id 123456
 
-  # Download an attachment
+  # Download an attachment (using page ID)
   md2cf download-attachment 123456 document.md \\
       --url https://yoursite.atlassian.net \\
       --token YOUR_PAT_TOKEN \\
       -o ./downloads/document.md
+
+  # Download an attachment (using page URL)
+  md2cf download-attachment "https://yoursite.atlassian.net/wiki/spaces/DEMO/pages/123456/Title" document.md \\
+      --url https://yoursite.atlassian.net \\
+      --token YOUR_PAT_TOKEN
+
+  # Update local file with remote changes (if newer)
+  md2cf update-source My_Page.md
 
 Environment Variables:
   CONFLUENCE_URL       Confluence base URL
   CONFLUENCE_TOKEN     Personal Access Token
   CONFLUENCE_SPACE     Default space key
   JIRA_URL             Jira base URL for ticket link conversion
+  HOST                 API server host (default: 0.0.0.0)
+  PORT                 API server port (default: 8000)
+  WORKERS              Number of API workers (default: 4)
+  LOG_LEVEL            API log level (default: info)
         """,
     )
 
@@ -512,6 +736,37 @@ Environment Variables:
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # API command
+    api_parser = subparsers.add_parser(
+        "api",
+        help="Start the REST API server",
+    )
+    api_parser.add_argument(
+        "--host",
+        type=str,
+        default=os.environ.get("HOST", "0.0.0.0"),
+        help="Host to bind the API server (default: 0.0.0.0) [env: HOST]",
+    )
+    api_parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("PORT", "8000")),
+        help="Port to bind the API server (default: 8000) [env: PORT]",
+    )
+    api_parser.add_argument(
+        "--workers",
+        type=int,
+        default=int(os.environ.get("WORKERS", "4")),
+        help="Number of worker processes (default: 4) [env: WORKERS]",
+    )
+    api_parser.add_argument(
+        "--log-level",
+        type=str,
+        default=os.environ.get("LOG_LEVEL", "info"),
+        choices=["debug", "info", "warning", "error", "critical"],
+        help="Log level (default: info) [env: LOG_LEVEL]",
+    )
 
     # Convert command
     convert_parser = subparsers.add_parser(
@@ -565,7 +820,7 @@ Environment Variables:
     publish_parser.add_argument(
         "--parent-id",
         type=str,
-        help="Parent page ID",
+        help="Parent page ID or URL (e.g., 123456 or https://site.atlassian.net/wiki/spaces/SPACE/pages/123456/Title)",
     )
     publish_parser.add_argument(
         "--cloud",
@@ -604,7 +859,7 @@ Environment Variables:
     download_parser.add_argument(
         "page_id",
         type=str,
-        help="Page ID containing the attachment",
+        help="Page ID or Confluence page URL (e.g., 123456 or https://site.atlassian.net/wiki/spaces/SPACE/pages/123456/Title)",
     )
     download_parser.add_argument(
         "filename",
@@ -655,7 +910,7 @@ Environment Variables:
     download_source_parser.add_argument(
         "page_id",
         type=str,
-        help="Page ID containing the Markdown source",
+        help="Page ID or Confluence page URL (e.g., 123456 or https://site.atlassian.net/wiki/spaces/SPACE/pages/123456/Title)",
     )
     download_source_parser.add_argument(
         "-o", "--output",
@@ -693,6 +948,46 @@ Environment Variables:
         help="Disable SSL certificate verification",
     )
 
+    # Update-source command
+    update_source_parser = subparsers.add_parser(
+        "update-source",
+        help="Update a local Markdown file with the latest version from Confluence (if newer)",
+    )
+    update_source_parser.add_argument(
+        "input",
+        type=str,
+        help="Local Markdown file path (must contain frontmatter with page_id)",
+    )
+    update_source_parser.add_argument(
+        "--url",
+        type=str,
+        default=os.environ.get("CONFLUENCE_URL"),
+        help="Confluence base URL (e.g., https://yoursite.atlassian.net) [env: CONFLUENCE_URL]",
+    )
+    update_source_parser.add_argument(
+        "--token",
+        type=str,
+        default=os.environ.get("CONFLUENCE_TOKEN"),
+        help="Personal Access Token for authentication [env: CONFLUENCE_TOKEN]",
+    )
+    update_source_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        default=True,
+        help="Use Confluence Cloud API (default: True)",
+    )
+    update_source_parser.add_argument(
+        "--server",
+        action="store_false",
+        dest="cloud",
+        help="Use Confluence Server/Data Center API",
+    )
+    update_source_parser.add_argument(
+        "--no-verify-ssl",
+        action="store_true",
+        help="Disable SSL certificate verification",
+    )
+
     return parser
 
 
@@ -715,7 +1010,9 @@ def main(argv: Optional[list] = None) -> int:
         parser.print_help()
         return 1
 
-    if args.command == "convert":
+    if args.command == "api":
+        return api_command(args)
+    elif args.command == "convert":
         return convert_command(args)
     elif args.command == "publish":
         return publish_command(args)
@@ -723,6 +1020,8 @@ def main(argv: Optional[list] = None) -> int:
         return download_attachment_command(args)
     elif args.command == "download-source":
         return download_source_command(args)
+    elif args.command == "update-source":
+        return update_source_command(args)
     else:
         parser.print_help()
         return 1
