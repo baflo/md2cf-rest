@@ -525,6 +525,12 @@ async def publish_to_confluence(
                 )
                 content = converter.convert(request.markdown)
                 image_refs = []
+        
+
+        with open("/app/examples/.testdaten/input.md", "w", encoding="utf-8") as f:
+            f.write(request.markdown)
+        with open("/app/examples/.testdaten/output.html", "w", encoding="utf-8") as f:
+            f.write(content)
 
         # Create or update page
         page = client.create_or_update_page(

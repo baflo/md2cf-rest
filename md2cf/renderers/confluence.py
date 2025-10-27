@@ -141,16 +141,73 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
             **attrs: Additional attributes
 
         Returns:
-            Confluence list markup or task list
+            Confluence list markup or task list (or mixed)
         """
-        # Check if this is a task list by looking for <ac:task> elements
-        is_task_list = '<ac:task>' in text
+        import re
 
-        if is_task_list:
-            # Wrap task items in ac:task-list
+        # Check if this is a pure task list, pure regular list, or mixed
+        has_tasks = '<ac:task>' in text
+        has_regular_items = '<li>' in text
+
+        if has_tasks and has_regular_items:
+            # Mixed list: Confluence doesn't allow <li> inside <ac:task-list>
+            # Extract and group items by type while maintaining order
+
+            items = []  # List of (type, content) tuples
+
+            # Extract all <li> and <ac:task> elements in order
+            for match in re.finditer(r'<li>(.*?)</li>|<ac:task>(.*?)</ac:task>', text, re.DOTALL):
+                if match.group(1) is not None:
+                    # Regular list item
+                    items.append(('li', match.group(0)))
+                else:
+                    # Task item
+                    items.append(('task', match.group(0)))
+
+            # Build result: group consecutive items of same type
+            tag = "ol" if ordered else "ul"
+            result = []
+            current_type = None
+            current_group = []
+
+            for item_type, content in items:
+                if item_type != current_type:
+                    # Flush previous group
+                    if current_group:
+                        if current_type == 'li':
+                            result.append(f"<{tag}>\n")
+                            result.append('\n'.join(current_group))
+                            result.append(f"\n</{tag}>\n")
+                        else:  # task
+                            result.append("<ac:task-list>\n")
+                            result.append('\n'.join(current_group))
+                            result.append("\n</ac:task-list>\n")
+
+                    # Start new group
+                    current_type = item_type
+                    current_group = [content]
+                else:
+                    # Same type, add to current group
+                    current_group.append(content)
+
+            # Flush last group
+            if current_group:
+                if current_type == 'li':
+                    result.append(f"<{tag}>\n")
+                    result.append('\n'.join(current_group))
+                    result.append(f"\n</{tag}>\n")
+                else:  # task
+                    result.append("<ac:task-list>\n")
+                    result.append('\n'.join(current_group))
+                    result.append("\n</ac:task-list>\n")
+
+            return ''.join(result)
+
+        elif has_tasks:
+            # Pure task list
             return f"<ac:task-list>\n{text}</ac:task-list>\n"
         else:
-            # Regular list
+            # Pure regular list
             tag = "ol" if ordered else "ul"
             return f"<{tag}>\n{text}</{tag}>\n"
 

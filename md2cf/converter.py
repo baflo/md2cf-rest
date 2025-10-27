@@ -184,6 +184,15 @@ class MarkdownToConfluence:
             if extract_images and self.image_references:
                 logger.info(f"Extracted {len(self.image_references)} image references")
 
+            # Wrap the main content (excluding info panel) with excerpt macro
+            result = (
+                '<ac:structured-macro ac:name="excerpt" ac:schema-version="1">'
+                '<ac:rich-text-body>'
+                f'{result}'
+                '</ac:rich-text-body>'
+                '</ac:structured-macro>\n'
+            )
+
             # Add info panel at the top if enabled
             if self.add_info_panel:
                 info_panel = self._generate_info_panel()
@@ -227,7 +236,11 @@ class MarkdownToConfluence:
                 f'md2cf publish ./{filename_escaped} --space {space_key_value} --title "{title_value}"'
             )
 
+            # Wrap info panel in expand macro
             return (
+                '<ac:structured-macro ac:name="expand" ac:schema-version="1">'
+                '<ac:parameter ac:name="title">ℹ️ Diese Seite wurde aus Markdown generiert</ac:parameter>'
+                '<ac:rich-text-body>'
                 '<ac:structured-macro ac:name="info" ac:schema-version="1">'
                 '<ac:rich-text-body>'
                 '<p>Diese Seite wurde mit <a href="https://bitbucket.lvm.de/bitbucket/users/m63119/repos/md2cf/browse">md2cf</a> automatisch aus Markdown generiert. '
@@ -239,14 +252,21 @@ class MarkdownToConfluence:
                 '<p><strong>CLI-Beispiel:</strong></p>'
                 f'<pre>{cli_example}</pre>'
                 '</ac:rich-text-body>'
+                '</ac:structured-macro>'
+                '</ac:rich-text-body>'
                 '</ac:structured-macro>\n'
             )
         else:
-            # No attachment link
+            # No attachment link - also wrap in expand macro
             return (
+                '<ac:structured-macro ac:name="expand" ac:schema-version="1">'
+                '<ac:parameter ac:name="title">ℹ️ Diese Seite wurde aus Markdown generiert</ac:parameter>'
+                '<ac:rich-text-body>'
                 '<ac:structured-macro ac:name="info" ac:schema-version="1">'
                 '<ac:rich-text-body>'
                 '<p>Diese Seite wurde mit <a href="https://bitbucket.lvm.de/bitbucket/users/m63119/repos/md2cf/browse">md2cf</a> automatisch aus Markdown generiert.</p>'
+                '</ac:rich-text-body>'
+                '</ac:structured-macro>'
                 '</ac:rich-text-body>'
                 '</ac:structured-macro>\n'
             )
