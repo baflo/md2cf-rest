@@ -150,8 +150,36 @@ Siehe [REST API Docs](docs/rest-api.md) für Details.
 | Images | `![alt](url)` | Confluence Image Macro |
 | Task Lists | `- [x] Done` | Confluence Task Macro |
 | Blockquotes | `> quote` | `<blockquote>` |
+| **Admonitions** | `!!! note "Title"` | Confluence Info/Warning/Note/Tip Macro |
 | PlantUML | ` ```plantuml ` | Confluence PlantUML Macro |
 | Jira Links | `[PROJ-123](jira-url)` | Confluence Jira Macro |
+
+### Admonitions
+
+md2cf unterstützt Markdown Admonitions und konvertiert sie automatisch zu Confluence Panel-Macros:
+
+```markdown
+!!! note "Wichtiger Hinweis"
+    Dies ist eine **wichtige** Information mit Markdown-Formatierung.
+
+    - Unterstützt Listen
+    - Und `Code`
+
+!!! warning "Achtung"
+    Dies ist eine Warnung!
+
+!!! info
+    Info ohne Titel
+
+!!! tip "Tipp"
+    Hilfreicher Tipp
+```
+
+**Unterstützte Typen:**
+- `note` → Confluence Note Panel (gelb)
+- `info`, `important` → Confluence Info Panel (blau)
+- `warning`, `danger`, `error`, `caution` → Confluence Warning Panel (rot)
+- `tip`, `hint` → Confluence Tip Panel (grün)
 
 ## Umgebungsvariablen
 

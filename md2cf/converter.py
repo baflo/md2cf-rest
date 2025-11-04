@@ -35,6 +35,7 @@ class ConfluenceMacroParser:
     def __init__(self):
         self.macro_counter = 0
         self.macro_map = {}  # Maps placeholder to macro definition
+        self.markdown_content_map = {}  # Maps marker to markdown content for conversion
 
     def preprocess(self, markdown_text: str) -> str:
         """
@@ -49,14 +50,73 @@ class ConfluenceMacroParser:
         # Reset state
         self.macro_counter = 0
         self.macro_map = {}
+        self.markdown_content_map = {}
 
-        # Process fenced macro blocks first (:::macro{...}...:::)
-        result = self._process_fenced_macros(markdown_text)
+        # Process admonitions first (!!! note, !!! warning, etc.)
+        result = self._process_admonitions(markdown_text)
+
+        # Process fenced macro blocks (:::macro{...}...:::)
+        result = self._process_fenced_macros(result)
 
         # Process inline macros (::macro{...}content::)
         result = self._process_inline_macros(result)
 
         return result
+
+    def _process_admonitions(self, text: str) -> str:
+        """
+        Process Markdown admonitions using image-like syntax: ![TYPE]
+
+        Supports syntax like:
+        > [!NOTE]
+        > Content here
+
+        > [!INFO]
+        > Content here
+
+        The content continues until the next [!TYPE] or end of section.
+        Converts to Confluence info/warning/note/tip macros.
+        """
+        # Pattern: ![TYPE] followed by content until next ![TYPE] or double newline
+        # Matches: ![NOTE], ![INFO], ![WARNING], ![TIP], etc.
+        pattern = r'^(?P<indent>[ \t]*)> \[(?P<label>![A-Z]+)\]\r?\n(?P<content>(?:^(?P=indent)> .*(?:\r?\n)?)+)'
+
+        def replace_admonition(match):
+            admonition_type = match.group('label').lower()
+            content = match.group('content').strip()
+
+            # Map admonition types to Confluence macro names
+            type_mapping = {
+                'note': 'note',
+                'info': 'info',
+                'warning': 'warning',
+                'danger': 'warning',
+                'error': 'warning',
+                'tip': 'tip',
+                'hint': 'tip',
+                'important': 'info',
+                'caution': 'warning',
+                'attention': 'note',
+            }
+
+            macro_name = type_mapping.get(admonition_type, 'info')
+
+            # Build parameters
+            params = {}
+            # if title:
+            #     params['title'] = title
+
+            # Use rich-text-body for admonitions to allow markdown formatting
+            body_type = 'rich-text-body'
+
+            # Mark content for markdown conversion
+            macro_html = self._generate_macro_html(macro_name, params, content, body_type, convert_markdown=True)
+
+            # Create placeholder
+            placeholder = self._create_placeholder(macro_html)
+            return placeholder + '\n'
+
+        return re.sub(pattern, replace_admonition, text, flags=re.MULTILINE)
 
     def _process_fenced_macros(self, text: str) -> str:
         """
@@ -168,7 +228,8 @@ class ConfluenceMacroParser:
             return 'rich-text-body'
 
     def _generate_macro_html(self, name: str, params: Dict[str, str],
-                           content: str, body_type: str) -> str:
+                           content: str, body_type: str,
+                           convert_markdown: bool = False) -> str:
         """
         Generate Confluence macro HTML.
 
@@ -177,6 +238,8 @@ class ConfluenceMacroParser:
             params: Macro parameters
             content: Macro content
             body_type: Type of macro body
+            convert_markdown: If True and body_type is rich-text-body,
+                             content will be marked for later markdown conversion
 
         Returns:
             Confluence macro HTML
@@ -202,8 +265,17 @@ class ConfluenceMacroParser:
             # Escape for URL/link content
             body_html = f'<ac:plain-text-link-body><![CDATA[{content}]]></ac:plain-text-link-body>'
         else:  # rich-text-body
-            # Content will be processed as Markdown, so don't escape
-            body_html = f'<ac:rich-text-body>{content}</ac:rich-text-body>'
+            # If convert_markdown is True, mark content for conversion
+            # We use a special marker that will be replaced during postprocessing
+            if convert_markdown:
+                # Store content with a unique marker
+                marker = f'<!--MARKDOWN_CONTENT_{self.macro_counter}-->'
+                self.markdown_content_map = getattr(self, 'markdown_content_map', {})
+                self.markdown_content_map[marker] = content
+                body_html = f'<ac:rich-text-body>{marker}</ac:rich-text-body>'
+            else:
+                # Content is already processed or doesn't need conversion
+                body_html = f'<ac:rich-text-body>{content}</ac:rich-text-body>'
 
         # Assemble complete macro
         macro_html = (
@@ -230,19 +302,51 @@ class ConfluenceMacroParser:
         self.macro_map[placeholder] = macro_html
         return placeholder
 
-    def postprocess(self, html: str) -> str:
+    def postprocess(self, html: str, converter_instance=None) -> str:
         """
-        Replace placeholders with actual macro HTML.
+        Replace placeholders with actual macro HTML and convert markdown content.
 
         Args:
             html: HTML with placeholders
+            converter_instance: MarkdownToConfluence instance for converting markdown content
 
         Returns:
-            HTML with macros restored
+            HTML with macros restored and markdown content converted
         """
         result = html
+
+        # First, replace placeholders with macro HTML
         for placeholder, macro_html in self.macro_map.items():
             result = result.replace(placeholder, macro_html)
+
+        # Then, convert any markdown content markers
+        if converter_instance and self.markdown_content_map:
+            for marker, markdown_content in self.markdown_content_map.items():
+                # Convert the markdown content to HTML using a temporary converter
+                # to avoid infinite recursion
+                import mistune
+                from md2cf.renderers.confluence import ConfluenceStorageFormatRenderer
+
+                temp_renderer = ConfluenceStorageFormatRenderer()
+                temp_renderer.set_jira_url(getattr(converter_instance, 'jira_url', None))
+                temp_markdown = mistune.create_markdown(
+                    renderer=temp_renderer,
+                    plugins=[
+                        "strikethrough",
+                        "table",
+                        "url",
+                        "task_lists",
+                    ],
+                )
+
+                # Convert markdown to HTML (without the wrapper info panels)
+                converted_content = temp_markdown(markdown_content)
+                if isinstance(converted_content, str):
+                    # Strip the outer paragraph tags if it's a single paragraph
+                    # to avoid double-wrapping
+                    converted_content = converted_content.strip()
+                    result = result.replace(marker, converted_content)
+
         return result
 
 
@@ -412,8 +516,8 @@ class MarkdownToConfluence:
         result = self.markdown(preprocessed)
 
         if isinstance(result, str):
-            # Restore macros from placeholders
-            result = self.macro_parser.postprocess(result)
+            # Restore macros from placeholders and convert markdown content
+            result = self.macro_parser.postprocess(result, converter_instance=self)
 
             logger.debug(f"Converted to {len(result)} characters of Confluence format")
             if extract_images and self.image_references:
