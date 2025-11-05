@@ -550,6 +550,58 @@ class ConfluenceStorageFormatRenderer(mistune.HTMLRenderer):
             f'</ac:task>\n'
         )
 
+    def confluence_macro(self, name: str, params: Dict[str, str],
+                        confluence_content: Optional[str],
+                        shared_content: Optional[str], **attrs: Any) -> str:
+        """
+        Render Confluence macro from HTML comment syntax.
+
+        Args:
+            name: Macro name (e.g., 'info', 'html', 'toc')
+            params: Dictionary of macro parameters
+            confluence_content: Content only for Confluence (from comment)
+            shared_content: Content for both Markdown and Confluence
+            **attrs: Additional attributes from token
+
+        Returns:
+            Confluence macro markup
+        """
+        # Build parameter elements
+        param_elements = []
+        for key, value in params.items():
+            value_escaped = escape(value, quote=False)
+            param_elements.append(
+                f'<ac:parameter ac:name="{escape(key, quote=False)}">{value_escaped}</ac:parameter>'
+            )
+        params_html = ''.join(param_elements)
+
+        # Determine body type and content
+        body_html = ''
+        content = confluence_content or shared_content or ''
+
+        if content:
+            # Determine body type based on macro name
+            if name.lower() in ('code', 'noformat', 'sql', 'json', 'xml', 'yaml', 'plantuml'):
+                # Plain text body with CDATA
+                body_html = f'<ac:plain-text-body><![CDATA[{content}]]></ac:plain-text-body>'
+            elif name.lower() == 'html':
+                # HTML macro uses plain-text-body with CDATA for HTML content
+                body_html = f'<ac:plain-text-body><![CDATA[{content}]]></ac:plain-text-body>'
+            else:
+                # Rich text body (allows HTML/formatting)
+                # For shared content, it needs to be converted from markdown already
+                body_html = f'<ac:rich-text-body>{content}</ac:rich-text-body>'
+
+        # Assemble complete macro
+        macro_html = (
+            f'<ac:structured-macro ac:name="{escape(name, quote=False)}" ac:schema-version="1">'
+            f'{params_html}'
+            f'{body_html}'
+            f'</ac:structured-macro>\n'
+        )
+
+        return macro_html
+
     def text(self, text: str, **attrs: Any) -> str:
         """
         Render plain text.

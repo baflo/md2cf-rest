@@ -22,14 +22,11 @@ class ConfluenceMacroParser:
     """
     Parser for Confluence macro syntax in Markdown.
 
-    Supports two syntaxes:
-    1. Fenced macro blocks:
-       :::macro{name="info" title="Important"}
-       Content here
-       :::
-
-    2. Inline macro shorthand:
-       ::macro{name="status" color="green"}Success::
+    Supports Confluence HTML comment syntax with four variants:
+    1. Self-closing: <!--confluence:toc param="value"/-->
+    2. Confluence-only: <!--confluence:html--><mark>text</mark><!--/confluence-->
+    3. Separate content: <!--confluence:info\n<p>CF</p>\n-->\nMD\n<!--/confluence-->
+    4. Shared content: <!--confluence:info title="Note"-->\nShared\n<!--/confluence-->
     """
 
     def __init__(self):
@@ -52,20 +49,126 @@ class ConfluenceMacroParser:
         self.macro_map = {}
         self.markdown_content_map = {}
 
-        # Process admonitions first (!!! note, !!! warning, etc.)
-        result = self._process_admonitions(markdown_text)
+        # Process Confluence comment macros (<!--confluence:...-->)
+        result = self._process_confluence_comments(markdown_text)
 
-        # Process fenced macro blocks (:::macro{...}...:::)
-        result = self._process_fenced_macros(result)
-
-        # Process inline macros (::macro{...}content::)
-        result = self._process_inline_macros(result)
+        # Process admonitions (!!! note, !!! warning, etc.)
+        result = self._process_admonitions(result)
 
         return result
 
+    def _convert_named_colors_to_hex(self, html_content: str) -> str:
+        """
+        Convert named CSS colors to saturated hex codes.
+
+        Args:
+            html_content: HTML content with potential named colors
+
+        Returns:
+            HTML content with hex color codes
+        """
+        # Saturated color palette mapping
+        color_mapping = {
+            'red': '#d04437',
+            'yellow': '#f6c342',
+            'green': '#14892c',
+            'blue': '#4a6785',
+            'grey': '#707070',
+            'gray': '#707070',
+            'orange': '#f79232',
+            'purple': '#8b5a99',
+        }
+
+        result = html_content
+        for color_name, hex_code in color_mapping.items():
+            # Replace background-color: colorname patterns
+            result = re.sub(
+                rf'background-color:\s*{color_name}\s*([;"\'\\)])',
+                rf'background-color: {hex_code}\1',
+                result,
+                flags=re.IGNORECASE
+            )
+
+        return result
+
+    def _process_confluence_comments(self, text: str) -> str:
+        """
+        Process Confluence comment syntax: <!--confluence:MACRO...-->
+
+        Supports four variants:
+        1. Self-closing: <!--confluence:toc param="value"/-->
+        2. Confluence-only: <!--confluence:html--><mark>text</mark><!--/confluence-->
+           (Content can start immediately or after newline/whitespace)
+        3. Separate content: <!--confluence:info\n<p>CF</p>\n-->\nMD\n<!--/confluence-->
+        4. Shared content: <!--confluence:info title="Hinweis"-->\nShared\n<!--/confluence-->
+        """
+        # Pattern for all variants
+        pattern = (
+            r'<!--\s*confluence:(?P<cf_name>\w+)(?P<cf_params>[^\n>]*?)'
+            r'(?:'
+            # Variant 1: Self-closing /-->
+            r'(?P<cf_self_close>/\s*-->)|'
+            # Variant 2: Confluence-only content (content can start immediately or after newline)
+            r'(?:-->(?P<cf_only>.*?)<!--\s*/confluence\s*-->)|'
+            # Variant 3+4: With closing --> and markdown content
+            r'(?:(?:\n(?P<cf_with_md>.*?)|(?P<cf_shared>))-->\n?'
+            r'(?P<md_content>.*?)'
+            r'^<!--\s*/confluence\s*-->)'
+            r')'
+        )
+
+        def replace_confluence_macro(match):
+            name = match.group('cf_name')
+            params_str = match.group('cf_params').strip() if match.group('cf_params') else ''
+            params = self._parse_params(params_str)
+
+            cf_content = None
+            shared_content = None
+            md_fallback = None
+
+            # Determine variant
+            if match.group('cf_self_close'):
+                # Variant 1: Self-closing
+                pass
+            elif match.group('cf_only'):
+                # Variant 2: Confluence-only
+                cf_content = match.group('cf_only').strip()
+            elif match.group('cf_with_md'):
+                # Variant 3: Separate content (has CF content before -->)
+                cf_content = match.group('cf_with_md').strip()
+                md_fallback = match.group('md_content').strip() if match.group('md_content') else ''
+            elif match.group('cf_shared') is not None:
+                # Variant 4: Shared content (no CF content before -->)
+                shared_content = match.group('md_content').strip() if match.group('md_content') else ''
+
+            # Determine body type
+            if name.lower() in ('code', 'noformat', 'sql', 'json', 'xml', 'yaml', 'plantuml'):
+                body_type = 'plain-text-body'
+            elif name.lower() == 'html':
+                body_type = 'plain-text-body'
+            else:
+                body_type = 'rich-text-body'
+
+            # Use shared_content or cf_content for the macro
+            content = cf_content or shared_content or ''
+
+            # Convert named colors to hex codes for HTML macros
+            if name.lower() == 'html' and content:
+                content = self._convert_named_colors_to_hex(content)
+            macro_html = self._generate_macro_html(name, params, content, body_type)
+            placeholder = self._create_placeholder(macro_html)
+
+            # Return placeholder + markdown fallback (if any)
+            if md_fallback:
+                return placeholder + '\n' + md_fallback
+            else:
+                return placeholder
+
+        return re.sub(pattern, replace_confluence_macro, text, flags=re.MULTILINE | re.DOTALL)
+
     def _process_admonitions(self, text: str) -> str:
         """
-        Process Markdown admonitions using image-like syntax: ![TYPE]
+        Process Markdown admonitions using GitHub-style blockquote syntax.
 
         Supports syntax like:
         > [!NOTE]
@@ -79,11 +182,11 @@ class ConfluenceMacroParser:
         """
         # Pattern: ![TYPE] followed by content until next ![TYPE] or double newline
         # Matches: ![NOTE], ![INFO], ![WARNING], ![TIP], etc.
-        pattern = r'^(?P<indent>[ \t]*)> \[(?P<label>![A-Z]+)\]\r?\n(?P<content>(?:^(?P=indent)> .*(?:\r?\n)?)+)'
+        pattern = r'^(?P<indent>[ \t]*)> \[\!(?P<label>[A-Z]+)\]\r?\n(?P<content>(?:^(?P=indent)> .*(?:\r?\n)?)+)'
 
         def replace_admonition(match):
             admonition_type = match.group('label').lower()
-            content = match.group('content').strip()
+            content = match.group('content')
 
             # Map admonition types to Confluence macro names
             type_mapping = {
@@ -103,8 +206,6 @@ class ConfluenceMacroParser:
 
             # Build parameters
             params = {}
-            # if title:
-            #     params['title'] = title
 
             # Use rich-text-body for admonitions to allow markdown formatting
             body_type = 'rich-text-body'
@@ -117,58 +218,6 @@ class ConfluenceMacroParser:
             return placeholder + '\n'
 
         return re.sub(pattern, replace_admonition, text, flags=re.MULTILINE)
-
-    def _process_fenced_macros(self, text: str) -> str:
-        """
-        Process fenced macro blocks: :::macro{params}...:::
-        """
-        # Pattern: :::macro{name="x" param="y"}
-        #          content
-        #          :::
-        pattern = r':::macro\{([^}]+)\}\s*\n(.*?)^:::\s*$'
-
-        def replace_macro(match):
-            params_str = match.group(1)
-            content = match.group(2).rstrip()
-
-            params = self._parse_params(params_str)
-            macro_name = params.pop('name', 'info')
-
-            # Determine body type based on macro and content
-            body_type = self._determine_body_type(macro_name, content, params)
-
-            macro_html = self._generate_macro_html(macro_name, params, content, body_type)
-
-            # Create placeholder
-            placeholder = self._create_placeholder(macro_html)
-            return placeholder
-
-        return re.sub(pattern, replace_macro, text, flags=re.MULTILINE | re.DOTALL)
-
-    def _process_inline_macros(self, text: str) -> str:
-        """
-        Process inline macros: ::macro{params}content::
-        """
-        # Pattern: ::macro{name="status" color="green"}Success::
-        pattern = r'::macro\{([^}]+)\}(.*?)::(?!\:)'
-
-        def replace_macro(match):
-            params_str = match.group(1)
-            content = match.group(2)
-
-            params = self._parse_params(params_str)
-            macro_name = params.pop('name', 'status')
-
-            # Inline macros typically use plain-text-body
-            body_type = 'plain-text-body'
-
-            macro_html = self._generate_macro_html(macro_name, params, content, body_type)
-
-            # For inline macros, return HTML directly (no placeholder needed)
-            placeholder = self._create_placeholder(macro_html)
-            return placeholder
-
-        return re.sub(pattern, replace_macro, text, flags=re.DOTALL)
 
     def _parse_params(self, params_str: str) -> Dict[str, str]:
         """
@@ -191,41 +240,6 @@ class ConfluenceMacroParser:
             params[key] = value
 
         return params
-
-    def _determine_body_type(self, macro_name: str, content: str, params: Dict[str, str]) -> str:
-        """
-        Determine the appropriate body type for a macro.
-
-        Args:
-            macro_name: Name of the macro
-            content: Content of the macro
-            params: Macro parameters
-
-        Returns:
-            Body type: 'rich-text-body', 'plain-text-body', or 'plain-text-link-body'
-        """
-        # Macros that typically use plain-text-body (no HTML/formatting)
-        plain_text_macros = {
-            'code', 'noformat', 'sql', 'json', 'xml', 'yaml',
-            'plantuml', 'drawio', 'latex'
-        }
-
-        # Macros that use plain-text-link-body (URLs)
-        link_macros = {
-            'widget', 'iframe', 'viewpdf'
-        }
-
-        # If explicit body_type parameter is provided, use it
-        if 'body_type' in params:
-            return params.pop('body_type')
-
-        if macro_name.lower() in plain_text_macros:
-            return 'plain-text-body'
-        elif macro_name.lower() in link_macros:
-            return 'plain-text-link-body'
-        else:
-            # Default: rich-text-body (allows HTML/formatting)
-            return 'rich-text-body'
 
     def _generate_macro_html(self, name: str, params: Dict[str, str],
                            content: str, body_type: str,
@@ -315,9 +329,9 @@ class ConfluenceMacroParser:
         """
         result = html
 
-        # First, replace placeholders with macro HTML
+        # First, replace placeholders with macro HTML (add two newlines after each macro)
         for placeholder, macro_html in self.macro_map.items():
-            result = result.replace(placeholder, macro_html)
+            result = result.replace(placeholder, macro_html + '\n\n')
 
         # Then, convert any markdown content markers
         if converter_instance and self.markdown_content_map:
