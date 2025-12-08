@@ -107,7 +107,7 @@ class ConfluenceMacroParser:
             r'<!--\s*confluence:(?P<cf_name>\w+)(?P<cf_params>[^\n>]*?)'
             r'(?:'
             # Variant 1: Self-closing /-->
-            r'(?P<cf_self_close>/\s*-->)|'
+            r'(?P<cf_blank_close>/\s*-->)|'
             # Variant 2: Confluence-only content (content can start immediately or after newline)
             r'(?:-->(?P<cf_only>.*?)<!--\s*/confluence\s*-->)|'
             # Variant 3+4: With closing --> and markdown content
@@ -127,7 +127,7 @@ class ConfluenceMacroParser:
             md_fallback = None
 
             # Determine variant
-            if match.group('cf_self_close'):
+            if match.group('cf_blank_close'):
                 # Variant 1: Self-closing
                 pass
             elif match.group('cf_only'):
@@ -155,7 +155,7 @@ class ConfluenceMacroParser:
             # Convert named colors to hex codes for HTML macros
             if name.lower() == 'html' and content:
                 content = self._convert_named_colors_to_hex(content)
-            macro_html = self._generate_macro_html(name, params, content, body_type)
+            macro_html = self._generate_macro_html(name, params, content, body_type, convert_markdown=True)
             placeholder = self._create_placeholder(macro_html)
 
             # Return placeholder + markdown fallback (if any)
