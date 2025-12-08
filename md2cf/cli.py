@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from md2cf.api.confluence import ConfluenceClient
+from md2cf.api.jira import JiraClient
 from md2cf.converter import MarkdownToConfluence
 from md2cf.utils.frontmatter import FrontmatterMetadata, add_frontmatter, parse_frontmatter_metadata
 from md2cf.utils.url_parser import extract_page_id_from_url
@@ -399,6 +400,256 @@ def download_source_command(args: argparse.Namespace) -> int:
         return 1
 
 
+def jira_create_command(args: argparse.Namespace) -> int:
+    """
+    Handle the jira-create command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        # Validate required arguments
+        if not args.jira_url:
+            logging.error("JIRA URL is required (use --jira-url or set JIRA_URL env var)")
+            return 1
+        if not args.jira_token:
+            logging.error("JIRA token is required (use --jira-token or set JIRA_TOKEN env var)")
+            return 1
+        if not args.project:
+            logging.error("Project key is required (use --project)")
+            return 1
+        if not args.summary:
+            logging.error("Summary is required (use --summary)")
+            return 1
+
+        # Initialize JIRA client
+        client = JiraClient(
+            url=args.jira_url,
+            token=args.jira_token,
+            cloud=args.cloud,
+            verify_ssl=not args.no_verify_ssl,
+        )
+
+        # Parse custom fields if provided
+        custom_fields = {}
+        if args.custom_fields:
+            try:
+                import json
+                custom_fields = json.loads(args.custom_fields)
+            except json.JSONDecodeError as e:
+                logging.error(f"Invalid JSON for custom fields: {e}")
+                return 1
+
+        # Parse labels
+        labels = args.labels.split(",") if args.labels else None
+
+        # Create issue
+        issue = client.create_issue(
+            project=args.project,
+            summary=args.summary,
+            description=args.description or "",
+            issue_type=args.issue_type,
+            priority=args.priority,
+            assignee=args.assignee,
+            labels=labels,
+            custom_fields=custom_fields if custom_fields else None,
+        )
+
+        issue_url = client.get_issue_url(issue["key"])
+
+        print(f"Successfully created issue")
+        print(f"Key: {issue['key']}")
+        print(f"ID: {issue['id']}")
+        print(f"URL: {issue_url}")
+
+        return 0
+
+    except Exception as e:
+        logging.error(f"Failed to create issue: {e}")
+        return 1
+
+
+def jira_get_command(args: argparse.Namespace) -> int:
+    """
+    Handle the jira-get command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        # Validate required arguments
+        if not args.jira_url:
+            logging.error("JIRA URL is required (use --jira-url or set JIRA_URL env var)")
+            return 1
+        if not args.jira_token:
+            logging.error("JIRA token is required (use --jira-token or set JIRA_TOKEN env var)")
+            return 1
+
+        # Initialize JIRA client
+        client = JiraClient(
+            url=args.jira_url,
+            token=args.jira_token,
+            cloud=args.cloud,
+            verify_ssl=not args.no_verify_ssl,
+        )
+
+        # Get issue
+        issue = client.get_issue(args.issue_key)
+
+        if not issue:
+            logging.error(f"Issue '{args.issue_key}' not found")
+            return 1
+
+        # Extract relevant fields
+        fields = issue["fields"]
+        issue_url = client.get_issue_url(issue["key"])
+
+        print(f"Issue: {issue['key']}")
+        print(f"Summary: {fields['summary']}")
+        print(f"Type: {fields['issuetype']['name']}")
+        print(f"Status: {fields['status']['name']}")
+        print(f"Priority: {fields.get('priority', {}).get('name', 'None')}")
+
+        assignee = fields.get("assignee")
+        if assignee:
+            assignee_name = assignee.get("displayName") or assignee.get("name", "Unknown")
+            print(f"Assignee: {assignee_name}")
+        else:
+            print("Assignee: Unassigned")
+
+        print(f"Created: {fields['created']}")
+        print(f"Updated: {fields['updated']}")
+        print(f"URL: {issue_url}")
+
+        if args.verbose and fields.get("description"):
+            print(f"\nDescription:")
+            print(fields["description"])
+
+        return 0
+
+    except Exception as e:
+        logging.error(f"Failed to get issue: {e}")
+        return 1
+
+
+def jira_search_command(args: argparse.Namespace) -> int:
+    """
+    Handle the jira-search command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        # Validate required arguments
+        if not args.jira_url:
+            logging.error("JIRA URL is required (use --jira-url or set JIRA_URL env var)")
+            return 1
+        if not args.jira_token:
+            logging.error("JIRA token is required (use --jira-token or set JIRA_TOKEN env var)")
+            return 1
+        if not args.jql:
+            logging.error("JQL query is required (use --jql)")
+            return 1
+
+        # Initialize JIRA client
+        client = JiraClient(
+            url=args.jira_url,
+            token=args.jira_token,
+            cloud=args.cloud,
+            verify_ssl=not args.no_verify_ssl,
+        )
+
+        # Search issues
+        result = client.search_issues(
+            jql=args.jql,
+            limit=args.limit,
+        )
+
+        issues = result.get("issues", [])
+        total = result.get("total", 0)
+
+        print(f"Found {total} issue(s) (showing {len(issues)})")
+        print()
+
+        for issue in issues:
+            fields = issue["fields"]
+            print(f"{issue['key']}: {fields.get('summary', 'N/A')}")
+
+            issue_type = fields.get('issuetype', {})
+            if issue_type:
+                print(f"  Type: {issue_type.get('name', 'N/A')}")
+
+            status = fields.get('status', {})
+            if status:
+                print(f"  Status: {status.get('name', 'N/A')}")
+
+            print(f"  URL: {client.get_issue_url(issue['key'])}")
+            print()
+
+        return 0
+
+    except Exception as e:
+        logging.error(f"Failed to search issues: {e}")
+        return 1
+
+
+def jira_projects_command(args: argparse.Namespace) -> int:
+    """
+    Handle the jira-projects command.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        # Validate required arguments
+        if not args.jira_url:
+            logging.error("JIRA URL is required (use --jira-url or set JIRA_URL env var)")
+            return 1
+        if not args.jira_token:
+            logging.error("JIRA token is required (use --jira-token or set JIRA_TOKEN env var)")
+            return 1
+
+        # Initialize JIRA client
+        client = JiraClient(
+            url=args.jira_url,
+            token=args.jira_token,
+            cloud=args.cloud,
+            verify_ssl=not args.no_verify_ssl,
+        )
+
+        # Get projects
+        projects = client.get_projects(include_archived=args.include_archived)
+
+        print(f"Found {len(projects)} project(s)")
+        print()
+
+        for project in projects:
+            print(f"{project['key']}: {project['name']}")
+            if args.verbose and project.get("description"):
+                print(f"  Description: {project['description']}")
+            project_type = project.get("projectTypeKey", "unknown")
+            print(f"  Type: {project_type}")
+            print()
+
+        return 0
+
+    except Exception as e:
+        logging.error(f"Failed to list projects: {e}")
+        return 1
+
+
 def publish_command(args: argparse.Namespace) -> int:
     """
     Handle the publish command.
@@ -721,7 +972,8 @@ Environment Variables:
   CONFLUENCE_URL       Confluence base URL
   CONFLUENCE_TOKEN     Personal Access Token
   CONFLUENCE_SPACE     Default space key
-  JIRA_URL             Jira base URL for ticket link conversion
+  JIRA_URL             JIRA base URL
+  JIRA_TOKEN           JIRA Personal Access Token
   HOST                 API server host (default: 0.0.0.0)
   PORT                 API server port (default: 8000)
   WORKERS              Number of API workers (default: 4)
@@ -988,6 +1240,211 @@ Environment Variables:
         help="Disable SSL certificate verification",
     )
 
+    # JIRA create command
+    jira_create_parser = subparsers.add_parser(
+        "jira-create",
+        help="Create a new JIRA issue",
+    )
+    jira_create_parser.add_argument(
+        "--jira-url",
+        type=str,
+        default=os.environ.get("JIRA_URL"),
+        help="JIRA base URL (e.g., https://yoursite.atlassian.net) [env: JIRA_URL]",
+    )
+    jira_create_parser.add_argument(
+        "--jira-token",
+        type=str,
+        default=os.environ.get("JIRA_TOKEN"),
+        help="Personal Access Token for authentication [env: JIRA_TOKEN]",
+    )
+    jira_create_parser.add_argument(
+        "--project",
+        type=str,
+        required=True,
+        help="Project key (e.g., DEMO)",
+    )
+    jira_create_parser.add_argument(
+        "--summary",
+        type=str,
+        required=True,
+        help="Issue summary/title",
+    )
+    jira_create_parser.add_argument(
+        "--description",
+        type=str,
+        help="Issue description",
+    )
+    jira_create_parser.add_argument(
+        "--issue-type",
+        type=str,
+        default="Task",
+        help="Issue type (default: Task)",
+    )
+    jira_create_parser.add_argument(
+        "--priority",
+        type=str,
+        help="Priority (e.g., High, Medium, Low)",
+    )
+    jira_create_parser.add_argument(
+        "--assignee",
+        type=str,
+        help="Assignee username/email or account ID",
+    )
+    jira_create_parser.add_argument(
+        "--labels",
+        type=str,
+        help="Comma-separated list of labels (e.g., bug,urgent)",
+    )
+    jira_create_parser.add_argument(
+        "--custom-fields",
+        type=str,
+        help='Custom fields as JSON (e.g., \'{"customfield_10001": "value"}\')',
+    )
+    jira_create_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        default=False,
+        help="Use JIRA Cloud API",
+    )
+    jira_create_parser.add_argument(
+        "--server",
+        action="store_false",
+        dest="cloud",
+        help="Use JIRA Server/Data Center API (default)",
+    )
+    jira_create_parser.add_argument(
+        "--no-verify-ssl",
+        action="store_true",
+        help="Disable SSL certificate verification",
+    )
+
+    # JIRA get command
+    jira_get_parser = subparsers.add_parser(
+        "jira-get",
+        help="Get JIRA issue by key",
+    )
+    jira_get_parser.add_argument(
+        "issue_key",
+        type=str,
+        help="Issue key (e.g., PROJ-123)",
+    )
+    jira_get_parser.add_argument(
+        "--jira-url",
+        type=str,
+        default=os.environ.get("JIRA_URL"),
+        help="JIRA base URL (e.g., https://yoursite.atlassian.net) [env: JIRA_URL]",
+    )
+    jira_get_parser.add_argument(
+        "--jira-token",
+        type=str,
+        default=os.environ.get("JIRA_TOKEN"),
+        help="Personal Access Token for authentication [env: JIRA_TOKEN]",
+    )
+    jira_get_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        default=False,
+        help="Use JIRA Cloud API",
+    )
+    jira_get_parser.add_argument(
+        "--server",
+        action="store_false",
+        dest="cloud",
+        help="Use JIRA Server/Data Center API (default)",
+    )
+    jira_get_parser.add_argument(
+        "--no-verify-ssl",
+        action="store_true",
+        help="Disable SSL certificate verification",
+    )
+
+    # JIRA search command
+    jira_search_parser = subparsers.add_parser(
+        "jira-search",
+        help="Search JIRA issues with JQL",
+    )
+    jira_search_parser.add_argument(
+        "--jql",
+        type=str,
+        required=True,
+        help='JQL query (e.g., "project = DEMO AND status = Open")',
+    )
+    jira_search_parser.add_argument(
+        "--limit",
+        type=int,
+        default=50,
+        help="Maximum number of results (default: 50)",
+    )
+    jira_search_parser.add_argument(
+        "--jira-url",
+        type=str,
+        default=os.environ.get("JIRA_URL"),
+        help="JIRA base URL (e.g., https://yoursite.atlassian.net) [env: JIRA_URL]",
+    )
+    jira_search_parser.add_argument(
+        "--jira-token",
+        type=str,
+        default=os.environ.get("JIRA_TOKEN"),
+        help="Personal Access Token for authentication [env: JIRA_TOKEN]",
+    )
+    jira_search_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        default=False,
+        help="Use JIRA Cloud API",
+    )
+    jira_search_parser.add_argument(
+        "--server",
+        action="store_false",
+        dest="cloud",
+        help="Use JIRA Server/Data Center API (default)",
+    )
+    jira_search_parser.add_argument(
+        "--no-verify-ssl",
+        action="store_true",
+        help="Disable SSL certificate verification",
+    )
+
+    # JIRA projects command
+    jira_projects_parser = subparsers.add_parser(
+        "jira-projects",
+        help="List accessible JIRA projects",
+    )
+    jira_projects_parser.add_argument(
+        "--jira-url",
+        type=str,
+        default=os.environ.get("JIRA_URL"),
+        help="JIRA base URL (e.g., https://yoursite.atlassian.net) [env: JIRA_URL]",
+    )
+    jira_projects_parser.add_argument(
+        "--jira-token",
+        type=str,
+        default=os.environ.get("JIRA_TOKEN"),
+        help="Personal Access Token for authentication [env: JIRA_TOKEN]",
+    )
+    jira_projects_parser.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Include archived projects",
+    )
+    jira_projects_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        default=False,
+        help="Use JIRA Cloud API",
+    )
+    jira_projects_parser.add_argument(
+        "--server",
+        action="store_false",
+        dest="cloud",
+        help="Use JIRA Server/Data Center API (default)",
+    )
+    jira_projects_parser.add_argument(
+        "--no-verify-ssl",
+        action="store_true",
+        help="Disable SSL certificate verification",
+    )
+
     return parser
 
 
@@ -1022,6 +1479,14 @@ def main(argv: Optional[list] = None) -> int:
         return download_source_command(args)
     elif args.command == "update-source":
         return update_source_command(args)
+    elif args.command == "jira-create":
+        return jira_create_command(args)
+    elif args.command == "jira-get":
+        return jira_get_command(args)
+    elif args.command == "jira-search":
+        return jira_search_command(args)
+    elif args.command == "jira-projects":
+        return jira_projects_command(args)
     else:
         parser.print_help()
         return 1

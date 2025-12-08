@@ -7,7 +7,7 @@ to Confluence Storage Format and publishing to Confluence.
 
 import logging
 import re
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, Depends, File, Form, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +17,7 @@ from pathlib import Path as PathLib
 
 from md2cf.converter import MarkdownToConfluence
 from md2cf.api.confluence import ConfluenceClient
+from md2cf.api.jira import JiraClient
 
 
 logger = logging.getLogger(__name__)
@@ -307,6 +308,197 @@ class HealthResponse(BaseModel):
 
     status: str = Field(..., description="Service status")
     version: str = Field(..., description="API version")
+
+
+# JIRA Models
+
+class JiraCreateIssueRequest(BaseModel):
+    """Request model for creating a JIRA issue."""
+
+    jira_url: str = Field(..., description="JIRA base URL")
+    token: str = Field(..., description="Personal Access Token")
+    project: str = Field(..., description="Project key (e.g., DEMO)")
+    summary: str = Field(..., description="Issue summary/title")
+    description: str = Field(default="", description="Issue description")
+    issue_type: str = Field(default="Task", description="Issue type (e.g., Task, Bug, Story)")
+    priority: Optional[str] = Field(None, description="Priority (e.g., High, Medium, Low)")
+    assignee: Optional[str] = Field(None, description="Assignee username/email or account ID")
+    labels: Optional[List[str]] = Field(None, description="List of labels")
+    custom_fields: Optional[Dict[str, Any]] = Field(None, description="Custom fields dictionary")
+    cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "jira_url": "https://yoursite.atlassian.net",
+                "token": "YOUR_TOKEN_HERE",
+                "project": "DEMO",
+                "summary": "Test Issue",
+                "description": "This is a test issue",
+                "issue_type": "Task",
+                "priority": "Medium",
+                "labels": ["test", "automation"],
+                "cloud": True
+            }
+        }
+
+
+class JiraIssueResponse(BaseModel):
+    """Response model for JIRA issue operations."""
+
+    key: str = Field(..., description="Issue key (e.g., PROJ-123)")
+    id: str = Field(..., description="Issue ID")
+    url: str = Field(..., description="Issue URL")
+    summary: Optional[str] = Field(None, description="Issue summary")
+    status: Optional[str] = Field(None, description="Issue status")
+    issue_type: Optional[str] = Field(None, description="Issue type")
+    priority: Optional[str] = Field(None, description="Issue priority")
+    assignee: Optional[str] = Field(None, description="Assignee name")
+    created: Optional[str] = Field(None, description="Creation timestamp")
+    updated: Optional[str] = Field(None, description="Last update timestamp")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "key": "PROJ-123",
+                "id": "10001",
+                "url": "https://yoursite.atlassian.net/browse/PROJ-123",
+                "summary": "Test Issue",
+                "status": "Open",
+                "issue_type": "Task",
+                "priority": "Medium",
+                "assignee": "John Doe",
+                "created": "2025-01-23T12:00:00.000+0000",
+                "updated": "2025-01-23T14:30:00.000+0000"
+            }
+        }
+
+
+class JiraGetIssueRequest(BaseModel):
+    """Request model for getting a JIRA issue."""
+
+    jira_url: str = Field(..., description="JIRA base URL")
+    token: str = Field(..., description="Personal Access Token")
+    cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "jira_url": "https://yoursite.atlassian.net",
+                "token": "YOUR_TOKEN_HERE",
+                "cloud": True
+            }
+        }
+
+
+class JiraSearchRequest(BaseModel):
+    """Request model for searching JIRA issues."""
+
+    jira_url: str = Field(..., description="JIRA base URL")
+    token: str = Field(..., description="Personal Access Token")
+    jql: str = Field(..., description='JQL query (e.g., "project = DEMO AND status = Open")')
+    start: int = Field(0, ge=0, description="Starting index for pagination")
+    limit: int = Field(50, ge=1, le=100, description="Maximum number of results")
+    cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "jira_url": "https://yoursite.atlassian.net",
+                "token": "YOUR_TOKEN_HERE",
+                "jql": "project = DEMO AND status = Open",
+                "start": 0,
+                "limit": 50,
+                "cloud": True
+            }
+        }
+
+
+class JiraSearchResponse(BaseModel):
+    """Response model for JIRA issue search."""
+
+    issues: List[JiraIssueResponse] = Field(..., description="List of found issues")
+    total: int = Field(..., description="Total number of issues found")
+    start_at: int = Field(..., description="Starting index")
+    max_results: int = Field(..., description="Maximum results per page")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "issues": [
+                    {
+                        "key": "PROJ-123",
+                        "id": "10001",
+                        "url": "https://yoursite.atlassian.net/browse/PROJ-123",
+                        "summary": "Test Issue",
+                        "status": "Open",
+                        "issue_type": "Task"
+                    }
+                ],
+                "total": 1,
+                "start_at": 0,
+                "max_results": 50
+            }
+        }
+
+
+class JiraProjectInfo(BaseModel):
+    """Model for a JIRA project."""
+
+    key: str = Field(..., description="Project key")
+    name: str = Field(..., description="Project name")
+    project_type: str = Field(..., description="Project type")
+    description: Optional[str] = Field(None, description="Project description")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "key": "DEMO",
+                "name": "Demo Project",
+                "project_type": "software",
+                "description": "This is a demo project"
+            }
+        }
+
+
+class JiraProjectsRequest(BaseModel):
+    """Request model for listing JIRA projects."""
+
+    jira_url: str = Field(..., description="JIRA base URL")
+    token: str = Field(..., description="Personal Access Token")
+    include_archived: bool = Field(False, description="Include archived projects")
+    cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "jira_url": "https://yoursite.atlassian.net",
+                "token": "YOUR_TOKEN_HERE",
+                "include_archived": False,
+                "cloud": True
+            }
+        }
+
+
+class JiraProjectsResponse(BaseModel):
+    """Response model for listing JIRA projects."""
+
+    projects: List[JiraProjectInfo] = Field(..., description="List of projects")
+    total: int = Field(..., description="Total number of projects")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "projects": [
+                    {
+                        "key": "DEMO",
+                        "name": "Demo Project",
+                        "project_type": "software"
+                    }
+                ],
+                "total": 1
+            }
+        }
 
 
 # Create FastAPI app
@@ -873,6 +1065,246 @@ async def search_pages(request: SearchPagesRequest) -> SearchPagesResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to search pages: {str(e)}"
+        )
+
+
+@app.post("/jira/create", response_model=JiraIssueResponse, status_code=status.HTTP_201_CREATED)
+async def create_jira_issue(request: JiraCreateIssueRequest) -> JiraIssueResponse:
+    """
+    Create a new JIRA issue.
+
+    Args:
+        request: JiraCreateIssueRequest containing issue details
+
+    Returns:
+        JiraIssueResponse with the created issue information
+
+    Raises:
+        HTTPException: If issue creation fails
+    """
+    try:
+        # Initialize JIRA client
+        client = JiraClient(
+            url=request.jira_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Create issue
+        issue = client.create_issue(
+            project=request.project,
+            summary=request.summary,
+            description=request.description,
+            issue_type=request.issue_type,
+            priority=request.priority,
+            assignee=request.assignee,
+            labels=request.labels,
+            custom_fields=request.custom_fields,
+        )
+
+        issue_url = client.get_issue_url(issue["key"])
+
+        return JiraIssueResponse(
+            key=issue["key"],
+            id=issue["id"],
+            url=issue_url,
+            summary=request.summary,
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to create JIRA issue: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create issue: {str(e)}"
+        )
+
+
+@app.post("/jira/issue/{issue_key}", response_model=JiraIssueResponse, status_code=status.HTTP_200_OK)
+async def get_jira_issue(issue_key: str, request: JiraGetIssueRequest) -> JiraIssueResponse:
+    """
+    Get a JIRA issue by key.
+
+    Args:
+        issue_key: Issue key (e.g., PROJ-123)
+        request: JiraGetIssueRequest containing JIRA credentials
+
+    Returns:
+        JiraIssueResponse with issue details
+
+    Raises:
+        HTTPException: If issue not found or retrieval fails
+    """
+    try:
+        # Initialize JIRA client
+        client = JiraClient(
+            url=request.jira_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Get issue
+        issue = client.get_issue(issue_key)
+
+        if not issue:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Issue '{issue_key}' not found"
+            )
+
+        # Extract fields
+        fields = issue["fields"]
+        issue_url = client.get_issue_url(issue["key"])
+
+        assignee = fields.get("assignee")
+        assignee_name = None
+        if assignee:
+            assignee_name = assignee.get("displayName") or assignee.get("name")
+
+        return JiraIssueResponse(
+            key=issue["key"],
+            id=issue["id"],
+            url=issue_url,
+            summary=fields["summary"],
+            status=fields["status"]["name"],
+            issue_type=fields["issuetype"]["name"],
+            priority=fields.get("priority", {}).get("name"),
+            assignee=assignee_name,
+            created=fields.get("created"),
+            updated=fields.get("updated"),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get JIRA issue '{issue_key}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get issue: {str(e)}"
+        )
+
+
+@app.post("/jira/search", response_model=JiraSearchResponse, status_code=status.HTTP_200_OK)
+async def search_jira_issues(request: JiraSearchRequest) -> JiraSearchResponse:
+    """
+    Search JIRA issues with JQL.
+
+    Args:
+        request: JiraSearchRequest containing search query
+
+    Returns:
+        JiraSearchResponse with list of matching issues
+
+    Raises:
+        HTTPException: If search fails
+    """
+    try:
+        # Initialize JIRA client
+        client = JiraClient(
+            url=request.jira_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Search issues
+        result = client.search_issues(
+            jql=request.jql,
+            start=request.start,
+            limit=request.limit,
+        )
+
+        issues = result.get("issues", [])
+        issue_list = []
+
+        for issue in issues:
+            fields = issue["fields"]
+            issue_url = client.get_issue_url(issue["key"])
+
+            assignee = fields.get("assignee")
+            assignee_name = None
+            if assignee:
+                assignee_name = assignee.get("displayName") or assignee.get("name")
+
+            issue_list.append(
+                JiraIssueResponse(
+                    key=issue["key"],
+                    id=issue["id"],
+                    url=issue_url,
+                    summary=fields.get("summary"),
+                    status=fields.get("status", {}).get("name"),
+                    issue_type=fields.get("issuetype", {}).get("name"),
+                    priority=fields.get("priority", {}).get("name"),
+                    assignee=assignee_name,
+                    created=fields.get("created"),
+                    updated=fields.get("updated"),
+                )
+            )
+
+        return JiraSearchResponse(
+            issues=issue_list,
+            total=result.get("total", 0),
+            start_at=result.get("startAt", 0),
+            max_results=result.get("maxResults", 0),
+        )
+
+    except Exception as e:
+        # Better error logging and formatting
+        error_msg = str(e) if str(e) else repr(e)
+        logger.error(f"Failed to search JIRA issues: {error_msg}")
+        logger.error(f"Exception type: {type(e).__name__}")
+        import traceback
+        logger.debug(f"Full traceback:\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to search issues: {error_msg} (type: {type(e).__name__})"
+        )
+
+
+@app.post("/jira/projects", response_model=JiraProjectsResponse, status_code=status.HTTP_200_OK)
+async def list_jira_projects(request: JiraProjectsRequest) -> JiraProjectsResponse:
+    """
+    List accessible JIRA projects.
+
+    Args:
+        request: JiraProjectsRequest containing JIRA credentials
+
+    Returns:
+        JiraProjectsResponse with list of projects
+
+    Raises:
+        HTTPException: If listing projects fails
+    """
+    try:
+        # Initialize JIRA client
+        client = JiraClient(
+            url=request.jira_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Get projects
+        projects = client.get_projects(include_archived=request.include_archived)
+
+        project_list = []
+        for project in projects:
+            project_list.append(
+                JiraProjectInfo(
+                    key=project["key"],
+                    name=project["name"],
+                    project_type=project.get("projectTypeKey", "unknown"),
+                    description=project.get("description"),
+                )
+            )
+
+        return JiraProjectsResponse(
+            projects=project_list,
+            total=len(project_list),
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to list JIRA projects: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list projects: {str(e)}"
         )
 
 

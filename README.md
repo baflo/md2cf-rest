@@ -7,14 +7,22 @@ Konvertiere Markdown-Dateien zu Confluence Storage Format und publiziere sie dir
 
 ## Features
 
+### Confluence Integration
 - 🚀 **REST API & CLI**: Web-Service oder Command-Line Interface
 - 🔐 **PAT Authentication**: Sichere Authentifizierung mit Personal Access Tokens
 - 📝 **Full Markdown Support**: Headings, Lists, Code Blocks, Tables, Links, Images, Task Lists
 - 🔄 **Frontmatter Workflow**: Download → Edit → Re-publish mit automatischem Versioning
 - 🐳 **Docker Support**: Läuft out-of-the-box mit Docker
-- 🔗 **Jira Integration**: Automatische Konvertierung von Jira-Links zu Macros
+- 🔗 **Jira Link Integration**: Automatische Konvertierung von Jira-Links zu Macros
 - 📎 **Attachments**: Upload von Bildern und Dateien
 - 🌳 **PlantUML Support**: Diagramme als Confluence Macros
+
+### JIRA Integration
+- 🎫 **Issue Management**: Tickets erstellen, abrufen und suchen
+- 🔍 **JQL Support**: Erweiterte Suche mit JIRA Query Language
+- 🏷️ **Custom Fields**: Unterstützung für benutzerdefinierte Felder
+- 📋 **Project Management**: Projekte auflisten und verwalten
+- 🌐 **REST API & CLI**: Vollständige JIRA-Funktionalität über beide Schnittstellen
 
 ## Quick Start
 
@@ -64,6 +72,27 @@ md2cf download-source 123456
 
 # Download existing page (by URL)
 md2cf download-source "https://your-domain.atlassian.net/wiki/spaces/DEMO/pages/123456/Title"
+
+# JIRA Issue Management
+# Create issue
+md2cf jira-create \
+  --jira-url https://your-domain.atlassian.net \
+  --jira-token YOUR_JIRA_TOKEN \
+  --project DEMO \
+  --summary "New Feature Request" \
+  --description "Detailed description" \
+  --issue-type Story \
+  --priority High \
+  --labels feature,backend
+
+# Get issue details
+md2cf jira-get DEMO-123
+
+# Search issues with JQL
+md2cf jira-search --jql "project = DEMO AND status = Open" --limit 20
+
+# List projects
+md2cf jira-projects
 ```
 
 ## Frontmatter Workflow
@@ -128,10 +157,18 @@ uvicorn md2cf.rest_api:app --host 0.0.0.0 --port 8000
 API Dokumentation: http://localhost:8000/docs
 
 **Wichtige Endpoints:**
+
+*Confluence:*
 - `POST /convert` - Konvertiere Markdown zu Confluence Format
 - `POST /publish` - Publiziere zu Confluence (mit Attachments)
 - `POST /spaces` - Liste verfügbare Spaces
 - `POST /search-pages` - Suche nach Pages
+
+*JIRA:*
+- `POST /jira/create` - Erstelle JIRA Issue
+- `POST /jira/issue/{key}` - Hole Issue-Details
+- `POST /jira/search` - Suche Issues mit JQL
+- `POST /jira/projects` - Liste Projekte
 
 Siehe [REST API Docs](docs/rest-api.md) für Details.
 
@@ -183,11 +220,17 @@ md2cf unterstützt Markdown Admonitions und konvertiert sie automatisch zu Confl
 
 ## Umgebungsvariablen
 
+### Confluence
 ```bash
 export CONFLUENCE_URL="https://your-domain.atlassian.net/wiki"
 export CONFLUENCE_TOKEN="your-personal-access-token"
 export CONFLUENCE_SPACE="DEMO"  # Optional: Default Space
-export JIRA_URL="https://jira.example.com"  # Optional: Jira Link Conversion
+```
+
+### JIRA
+```bash
+export JIRA_URL="https://your-domain.atlassian.net"
+export JIRA_TOKEN="your-jira-personal-access-token"
 ```
 
 ## Personal Access Token erstellen
@@ -202,6 +245,20 @@ export JIRA_URL="https://jira.example.com"  # Optional: Jira Link Conversion
 ### Confluence Server/Data Center
 
 1. Confluence → **Settings** → **Personal Access Tokens**
+2. **Create token** (Admin-Rechte erforderlich)
+3. Token kopieren
+
+### JIRA Cloud
+
+1. JIRA → **Profile** → **Personal Access Tokens**
+2. **Create token**
+3. Name eingeben, Ablaufdatum wählen
+4. Berechtigungen auswählen (mindestens: Projekte lesen, Issues erstellen/bearbeiten)
+5. Token kopieren (wird nur einmal angezeigt!)
+
+### JIRA Server/Data Center
+
+1. JIRA → **Profile** → **Personal Access Tokens**
 2. **Create token** (Admin-Rechte erforderlich)
 3. Token kopieren
 
