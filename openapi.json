@@ -86,13 +86,13 @@
     "/publish": {
       "post": {
         "summary": "Publish To Confluence",
-        "description": "Convert Markdown and publish to Confluence.\n\nArgs:\n    request: PublishRequest containing the Markdown and Confluence details\n\nReturns:\n    PublishResponse with the created/updated page information\n\nRaises:\n    HTTPException: If conversion or publishing fails",
+        "description": "Convert Markdown and publish to Confluence with optional attachments.\n\nThis endpoint accepts:\n- Markdown content as form data (via PublishRequest model)\n- Optional multiple file attachments\n- Confluence connection details\n\nImages referenced in the Markdown (e.g., ![alt](image.png)) will be automatically\nlinked to uploaded attachments with matching filenames.\n\nSupports both:\n- Publishing without attachments (form data only)\n- Publishing with attachments (form data + files)\n\nArgs:\n    request: PublishRequest containing all form data fields\n    attachments: Optional list of attachment files to upload (default: empty list)\n\nReturns:\n    PublishResponse with the created/updated page information, version metadata,\n    timestamp of last modification, user who modified the page, and attachment status\n\nRaises:\n    HTTPException: If conversion or publishing fails",
         "operationId": "publish_to_confluence_publish_post",
         "requestBody": {
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/PublishRequest"
+                "$ref": "#/components/schemas/Body_publish_to_confluence_publish_post"
               }
             }
           },
@@ -121,10 +121,734 @@
           }
         }
       }
+    },
+    "/spaces": {
+      "post": {
+        "summary": "List Spaces",
+        "description": "List accessible Confluence spaces.\n\nArgs:\n    request: SpacesRequest containing Confluence credentials and optional filter\n\nReturns:\n    SpacesResponse with list of accessible spaces\n\nRaises:\n    HTTPException: If listing spaces fails",
+        "operationId": "list_spaces_spaces_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpacesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpacesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/space/{space_key}": {
+      "post": {
+        "summary": "Get Space",
+        "description": "Get detailed information about a Confluence space by its key.\n\nArgs:\n    space_key: Space key (from path parameter)\n    request: GetSpaceRequest containing Confluence credentials\n\nReturns:\n    SpaceDetailResponse with space details\n\nRaises:\n    HTTPException: If space not found or retrieval fails",
+        "operationId": "get_space_space__space_key__post",
+        "parameters": [
+          {
+            "name": "space_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Space Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetSpaceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpaceDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/page/{page_id}": {
+      "post": {
+        "summary": "Get Page",
+        "description": "Get detailed information about a Confluence page by its ID.\n\nArgs:\n    page_id: Page ID (from path parameter)\n    request: GetPageRequest containing Confluence credentials\n\nReturns:\n    PageDetailResponse with page details\n\nRaises:\n    HTTPException: If page not found or retrieval fails",
+        "operationId": "get_page_page__page_id__post",
+        "parameters": [
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Page Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetPageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search-pages": {
+      "post": {
+        "summary": "Search Pages",
+        "description": "Search for Confluence pages by title or content.\n\nArgs:\n    request: SearchPagesRequest containing search query and optional space filter\n\nReturns:\n    SearchPagesResponse with list of matching pages\n\nRaises:\n    HTTPException: If search fails",
+        "operationId": "search_pages_search_pages_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchPagesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPagesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jira/create": {
+      "post": {
+        "summary": "Create Jira Issue",
+        "description": "Create a new JIRA issue with optional attachments.\n\nThis endpoint accepts:\n- Issue details as form data (via JiraCreateIssueRequest model)\n- Optional multiple file attachments\n- JIRA connection details\n\nArgs:\n    request: JiraCreateIssueRequest containing issue details\n    attachments: Optional list of attachment files to upload (default: empty list)\n\nReturns:\n    JiraIssueResponse with the created issue information and attachment status\n\nRaises:\n    HTTPException: If issue creation fails",
+        "operationId": "create_jira_issue_jira_create_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_jira_issue_jira_create_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraIssueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jira/issue/{issue_key}": {
+      "put": {
+        "summary": "Update Jira Issue",
+        "description": "Update an existing JIRA issue with transparent data format.\n\nThis endpoint accepts the issue fields in the exact JIRA API format and passes\nthem transparently to the JIRA API without transformation. The caller is responsible\nfor providing the data in the correct JIRA format.\n\nArgs:\n    issue_key: The key of the issue to update (e.g., \"PROJ-123\")\n    request: JiraUpdateIssueRequest containing the fields to update in JIRA format\n\nReturns:\n    JiraIssueDetailResponse with the complete updated issue information from JIRA\n\nRaises:\n    HTTPException: If the issue is not found or the update fails\n\nExample:\n    To update summary and priority:\n    {\n        \"jira_url\": \"https://yoursite.atlassian.net\",\n        \"token\": \"YOUR_TOKEN\",\n        \"fields\": {\n            \"summary\": \"New Summary\",\n            \"priority\": {\"name\": \"High\"}\n        },\n        \"cloud\": true\n    }",
+        "operationId": "update_jira_issue_jira_issue__issue_key__put",
+        "parameters": [
+          {
+            "name": "issue_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraUpdateIssueRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraIssueDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Get Jira Issue",
+        "description": "Get a JIRA issue by key with complete raw data from JIRA API.\n\nThis endpoint returns the complete issue data transparently as received\nfrom JIRA, including all fields, metadata, and expanded properties.\n\nArgs:\n    issue_key: Issue key (e.g., PROJ-123)\n    request: JiraGetIssueRequest containing JIRA credentials\n\nReturns:\n    JiraIssueDetailResponse with complete issue details from JIRA\n\nRaises:\n    HTTPException: If issue not found or retrieval fails",
+        "operationId": "get_jira_issue_jira_issue__issue_key__post",
+        "parameters": [
+          {
+            "name": "issue_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraGetIssueRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraIssueDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jira/search": {
+      "post": {
+        "summary": "Search Jira Issues",
+        "description": "Search JIRA issues with JQL.\n\nArgs:\n    request: JiraSearchRequest containing search query\n\nReturns:\n    JiraSearchResponse with list of matching issues\n\nRaises:\n    HTTPException: If search fails",
+        "operationId": "search_jira_issues_jira_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jira/projects": {
+      "post": {
+        "summary": "List Jira Projects",
+        "description": "List accessible JIRA projects.\n\nArgs:\n    request: JiraProjectsRequest containing JIRA credentials\n\nReturns:\n    JiraProjectsResponse with list of projects\n\nRaises:\n    HTTPException: If listing projects fails",
+        "operationId": "list_jira_projects_jira_projects_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraProjectsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraProjectsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jira/create-meta": {
+      "post": {
+        "summary": "Get Jira Create Meta",
+        "description": "Get metadata for creating JIRA issues (fields, allowed values, etc.).\n\nThis endpoint provides information about:\n- Available issue types for each project\n- Required and optional fields for each issue type\n- Allowed values for fields (e.g., priorities, statuses)\n- Custom field definitions\n\nArgs:\n    request: JiraCreateMetaRequest containing JIRA credentials and optional filters\n\nReturns:\n    JiraCreateMetaResponse with project and issue type metadata\n\nRaises:\n    HTTPException: If metadata retrieval fails",
+        "operationId": "get_jira_create_meta_jira_create_meta_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraCreateMetaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraCreateMetaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jira/issue/{issue_key}/edit-meta": {
+      "post": {
+        "summary": "Get Jira Edit Meta",
+        "description": "Get metadata for editing a JIRA issue (fields, allowed values, etc.).\n\nThis endpoint provides information about:\n- Editable fields for the specific issue\n- Required and optional fields\n- Allowed values for fields (e.g., priorities, statuses)\n- Field operations (set, add, remove, etc.)\n\nArgs:\n    issue_key: Issue key (e.g., PROJ-123)\n    request: JiraEditMetaRequest containing JIRA credentials\n\nReturns:\n    JiraEditMetaResponse with field metadata for editing\n\nRaises:\n    HTTPException: If metadata retrieval fails",
+        "operationId": "get_jira_edit_meta_jira_issue__issue_key__edit_meta_post",
+        "parameters": [
+          {
+            "name": "issue_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraEditMetaRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraEditMetaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jira/users": {
+      "post": {
+        "summary": "Search Jira Users",
+        "description": "Search for JIRA users (for assignee selection).\n\nThis endpoint allows searching for users by username, display name, or email.\nOptionally filter by project to get only assignable users for that project.\nIf the query is empty but a project is provided, it returns all assignable\nusers for that project.\n\nArgs:\n    request: JiraUsersRequest containing search query and optional project filter\n\nReturns:\n    JiraUsersResponse with list of matching users\n\nRaises:\n    HTTPException: If user search fails",
+        "operationId": "search_jira_users_jira_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraUsersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraUsersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jira/fields": {
+      "post": {
+        "summary": "Get Jira Fields",
+        "description": "Get all available JIRA fields (including custom fields).\n\nThis endpoint provides information about all fields available in JIRA,\nincluding system fields and custom fields with their types and properties.\n\nArgs:\n    request: JiraFieldsRequest containing JIRA credentials\n\nReturns:\n    JiraFieldsResponse with list of all fields\n\nRaises:\n    HTTPException: If fields retrieval fails",
+        "operationId": "get_jira_fields_jira_fields_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JiraFieldsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraFieldsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "Body_create_jira_issue_jira_create_post": {
+        "properties": {
+          "attachments": {
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "type": "array",
+            "title": "Attachments"
+          },
+          "jira_url": {
+            "type": "string",
+            "title": "Jira Url",
+            "description": "JIRA base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token"
+          },
+          "project": {
+            "type": "string",
+            "title": "Project",
+            "description": "Project key (e.g., DEMO)"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "Issue summary/title"
+          },
+          "issue_type": {
+            "type": "string",
+            "title": "Issue Type",
+            "description": "Issue type JSON object, e.g., '{\"id\": \"90\"}'"
+          },
+          "parent_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Key",
+            "description": "Key of the parent issue for sub-tasks"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields",
+            "description": "A JSON string containing all other fields for the issue."
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is JIRA Cloud (vs Server/Data Center)",
+            "default": false
+          },
+          "convert_markdown": {
+            "type": "boolean",
+            "title": "Convert Markdown",
+            "description": "Whether to convert description from Markdown to Jira Wiki Markup",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "jira_url",
+          "token",
+          "project",
+          "summary",
+          "issue_type"
+        ],
+        "title": "Body_create_jira_issue_jira_create_post"
+      },
+      "Body_publish_to_confluence_publish_post": {
+        "properties": {
+          "attachments": {
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "type": "array",
+            "title": "Attachments"
+          },
+          "markdown": {
+            "type": "string",
+            "title": "Markdown",
+            "description": "Markdown content to convert and publish"
+          },
+          "confluence_url": {
+            "type": "string",
+            "title": "Confluence Url",
+            "description": "Confluence base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token or API token"
+          },
+          "space": {
+            "type": "string",
+            "title": "Space",
+            "description": "Space key"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Page title"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id",
+            "description": "Parent page ID (optional)"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is Confluence Cloud (vs Server)",
+            "default": true
+          },
+          "jira_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jira Url",
+            "description": "Base Jira URL for converting Jira ticket links to macros"
+          },
+          "add_info_panel": {
+            "type": "boolean",
+            "title": "Add Info Panel",
+            "description": "Whether to add an info panel indicating the page was generated from Markdown",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "markdown",
+          "confluence_url",
+          "token",
+          "space",
+          "title"
+        ],
+        "title": "Body_publish_to_confluence_publish_post"
+      },
       "ConvertRequest": {
         "properties": {
           "markdown": {
@@ -168,6 +892,70 @@
           "confluence_storage_format": "<h1>Hello World</h1>\n<p>This is <strong>bold</strong> text.</p>\n"
         }
       },
+      "GetPageRequest": {
+        "properties": {
+          "confluence_url": {
+            "type": "string",
+            "title": "Confluence Url",
+            "description": "Confluence base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token or API token"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is Confluence Cloud (vs Server)",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "confluence_url",
+          "token"
+        ],
+        "title": "GetPageRequest",
+        "description": "Request model for getting a page by ID.",
+        "example": {
+          "cloud": true,
+          "confluence_url": "https://your-domain.atlassian.net/wiki",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "GetSpaceRequest": {
+        "properties": {
+          "confluence_url": {
+            "type": "string",
+            "title": "Confluence Url",
+            "description": "Confluence base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token or API token"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is Confluence Cloud (vs Server)",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "confluence_url",
+          "token"
+        ],
+        "title": "GetSpaceRequest",
+        "description": "Request model for getting a space by key.",
+        "example": {
+          "cloud": true,
+          "confluence_url": "https://your-domain.atlassian.net/wiki",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -202,32 +990,1023 @@
         "title": "HealthResponse",
         "description": "Response model for health check."
       },
-      "PublishRequest": {
+      "JiraCreateMetaRequest": {
         "properties": {
-          "markdown": {
+          "jira_url": {
             "type": "string",
-            "title": "Markdown",
-            "description": "Markdown content to convert and publish"
-          },
-          "confluence_url": {
-            "type": "string",
-            "title": "Confluence Url",
-            "description": "Confluence base URL"
+            "title": "Jira Url",
+            "description": "JIRA base URL"
           },
           "token": {
             "type": "string",
             "title": "Token",
-            "description": "Personal Access Token or API token"
+            "description": "Personal Access Token"
           },
-          "space": {
+          "project_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Keys",
+            "description": "Optional list of project keys to filter"
+          },
+          "issue_type_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Type Names",
+            "description": "Optional list of issue type names to filter"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is JIRA Cloud (vs Server/Data Center)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jira_url",
+          "token"
+        ],
+        "title": "JiraCreateMetaRequest",
+        "description": "Request model for getting issue creation metadata.",
+        "example": {
+          "cloud": true,
+          "issue_type_names": [
+            "Story",
+            "Bug"
+          ],
+          "jira_url": "https://yoursite.atlassian.net",
+          "project_keys": [
+            "SCH",
+            "FM"
+          ],
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "JiraCreateMetaResponse": {
+        "properties": {
+          "projects": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Projects",
+            "description": "List of projects with issue types and field definitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "projects"
+        ],
+        "title": "JiraCreateMetaResponse",
+        "description": "Response model for issue creation metadata.",
+        "example": {
+          "projects": [
+            {
+              "issuetypes": [
+                {
+                  "fields": {
+                    "assignee": {
+                      "allowedValues": [],
+                      "required": false
+                    },
+                    "summary": {
+                      "required": true,
+                      "schema": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "id": "10001",
+                  "name": "Story"
+                }
+              ],
+              "key": "SCH",
+              "name": "Schaden"
+            }
+          ]
+        }
+      },
+      "JiraEditMetaRequest": {
+        "properties": {
+          "jira_url": {
             "type": "string",
-            "title": "Space",
-            "description": "Space key"
+            "title": "Jira Url",
+            "description": "JIRA base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is JIRA Cloud (vs Server/Data Center)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jira_url",
+          "token"
+        ],
+        "title": "JiraEditMetaRequest",
+        "description": "Request model for getting issue edit metadata.",
+        "example": {
+          "cloud": true,
+          "jira_url": "https://yoursite.atlassian.net",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "JiraEditMetaResponse": {
+        "properties": {
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields",
+            "description": "Dictionary of editable fields with their definitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields"
+        ],
+        "title": "JiraEditMetaResponse",
+        "description": "Response model for issue edit metadata.",
+        "example": {
+          "fields": {
+            "assignee": {
+              "allowedValues": [],
+              "name": "Assignee",
+              "operations": [
+                "set"
+              ],
+              "required": false,
+              "schema": {
+                "type": "user"
+              }
+            },
+            "description": {
+              "name": "Description",
+              "operations": [
+                "set"
+              ],
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            "summary": {
+              "name": "Summary",
+              "operations": [
+                "set"
+              ],
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "JiraFieldsRequest": {
+        "properties": {
+          "jira_url": {
+            "type": "string",
+            "title": "Jira Url",
+            "description": "JIRA base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is JIRA Cloud (vs Server/Data Center)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jira_url",
+          "token"
+        ],
+        "title": "JiraFieldsRequest",
+        "description": "Request model for getting JIRA fields.",
+        "example": {
+          "cloud": true,
+          "jira_url": "https://yoursite.atlassian.net",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "JiraFieldsResponse": {
+        "properties": {
+          "fields": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Fields",
+            "description": "List of available fields"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields",
+          "total"
+        ],
+        "title": "JiraFieldsResponse",
+        "description": "Response model for fields.",
+        "example": {
+          "fields": [
+            {
+              "custom": true,
+              "id": "customfield_10001",
+              "name": "Story Points",
+              "schema": {
+                "type": "number"
+              }
+            }
+          ],
+          "total": 1
+        }
+      },
+      "JiraGetIssueRequest": {
+        "properties": {
+          "jira_url": {
+            "type": "string",
+            "title": "Jira Url",
+            "description": "JIRA base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is JIRA Cloud (vs Server/Data Center)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jira_url",
+          "token"
+        ],
+        "title": "JiraGetIssueRequest",
+        "description": "Request model for getting a JIRA issue.",
+        "example": {
+          "cloud": true,
+          "jira_url": "https://yoursite.atlassian.net",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "JiraIssueDetailResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Issue key (e.g., PROJ-123)"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Issue ID"
+          },
+          "self": {
+            "type": "string",
+            "title": "Self",
+            "description": "JIRA REST API URL for this issue"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Browser URL to view the issue"
+          },
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields",
+            "description": "All issue fields as returned by JIRA API"
+          },
+          "expand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expand",
+            "description": "Expanded properties"
+          },
+          "transitions": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transitions",
+            "description": "Available transitions if requested"
+          },
+          "changelog": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog",
+            "description": "Change history if requested"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "id",
+          "self",
+          "url",
+          "fields"
+        ],
+        "title": "JiraIssueDetailResponse",
+        "description": "Response model for JIRA issue details with complete raw data from JIRA API.",
+        "example": {
+          "expand": "renderedFields,names,schema",
+          "fields": {
+            "assignee": {
+              "accountId": "abc123",
+              "displayName": "John Doe"
+            },
+            "created": "2025-01-23T12:00:00.000+0000",
+            "description": "This is a test issue",
+            "issuetype": {
+              "id": "10",
+              "name": "Task"
+            },
+            "priority": {
+              "id": "3",
+              "name": "Medium"
+            },
+            "status": {
+              "id": "1",
+              "name": "Open"
+            },
+            "summary": "Test Issue",
+            "updated": "2025-01-23T14:30:00.000+0000"
+          },
+          "id": "10001",
+          "key": "PROJ-123",
+          "self": "https://yoursite.atlassian.net/rest/api/2/issue/10001",
+          "url": "https://yoursite.atlassian.net/browse/PROJ-123"
+        }
+      },
+      "JiraIssueResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Issue key (e.g., PROJ-123)"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Issue ID"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Issue URL"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary",
+            "description": "Issue summary"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Issue status"
+          },
+          "issue_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Type",
+            "description": "Issue type"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority",
+            "description": "Issue priority"
+          },
+          "assignee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee",
+            "description": "Assignee name"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created",
+            "description": "Creation timestamp"
+          },
+          "updated": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated",
+            "description": "Last update timestamp"
+          },
+          "attachments_uploaded": {
+            "type": "integer",
+            "title": "Attachments Uploaded",
+            "description": "Number of attachments uploaded",
+            "default": 0
+          },
+          "attachments_failed": {
+            "type": "integer",
+            "title": "Attachments Failed",
+            "description": "Number of attachments that failed to upload",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "id",
+          "url"
+        ],
+        "title": "JiraIssueResponse",
+        "description": "Response model for JIRA issue operations.",
+        "example": {
+          "assignee": "John Doe",
+          "attachments_failed": 0,
+          "attachments_uploaded": 2,
+          "created": "2025-01-23T12:00:00.000+0000",
+          "id": "10001",
+          "issue_type": "Task",
+          "key": "PROJ-123",
+          "priority": "Medium",
+          "status": "Open",
+          "summary": "Test Issue",
+          "updated": "2025-01-23T14:30:00.000+0000",
+          "url": "https://yoursite.atlassian.net/browse/PROJ-123"
+        }
+      },
+      "JiraProjectInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Project key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Project name"
+          },
+          "project_type": {
+            "type": "string",
+            "title": "Project Type",
+            "description": "Project type"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Project description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "project_type"
+        ],
+        "title": "JiraProjectInfo",
+        "description": "Model for a JIRA project.",
+        "example": {
+          "description": "This is a demo project",
+          "key": "DEMO",
+          "name": "Demo Project",
+          "project_type": "software"
+        }
+      },
+      "JiraProjectsRequest": {
+        "properties": {
+          "jira_url": {
+            "type": "string",
+            "title": "Jira Url",
+            "description": "JIRA base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token"
+          },
+          "include_archived": {
+            "type": "boolean",
+            "title": "Include Archived",
+            "description": "Include archived projects",
+            "default": false
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is JIRA Cloud (vs Server/Data Center)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jira_url",
+          "token"
+        ],
+        "title": "JiraProjectsRequest",
+        "description": "Request model for listing JIRA projects.",
+        "example": {
+          "cloud": true,
+          "include_archived": false,
+          "jira_url": "https://yoursite.atlassian.net",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "JiraProjectsResponse": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/JiraProjectInfo"
+            },
+            "type": "array",
+            "title": "Projects",
+            "description": "List of projects"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of projects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "projects",
+          "total"
+        ],
+        "title": "JiraProjectsResponse",
+        "description": "Response model for listing JIRA projects.",
+        "example": {
+          "projects": [
+            {
+              "key": "DEMO",
+              "name": "Demo Project",
+              "project_type": "software"
+            }
+          ],
+          "total": 1
+        }
+      },
+      "JiraSearchRequest": {
+        "properties": {
+          "jira_url": {
+            "type": "string",
+            "title": "Jira Url",
+            "description": "JIRA base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token"
+          },
+          "jql": {
+            "type": "string",
+            "title": "Jql",
+            "description": "JQL query (e.g., \"project = DEMO AND status = Open\")"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start",
+            "description": "Starting index for pagination",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Maximum number of results",
+            "default": 50
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is JIRA Cloud (vs Server/Data Center)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jira_url",
+          "token",
+          "jql"
+        ],
+        "title": "JiraSearchRequest",
+        "description": "Request model for searching JIRA issues.",
+        "example": {
+          "cloud": true,
+          "jira_url": "https://yoursite.atlassian.net",
+          "jql": "project = DEMO AND status = Open",
+          "limit": 50,
+          "start": 0,
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "JiraSearchResponse": {
+        "properties": {
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/JiraIssueResponse"
+            },
+            "type": "array",
+            "title": "Issues",
+            "description": "List of found issues"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of issues found"
+          },
+          "start_at": {
+            "type": "integer",
+            "title": "Start At",
+            "description": "Starting index"
+          },
+          "max_results": {
+            "type": "integer",
+            "title": "Max Results",
+            "description": "Maximum results per page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "issues",
+          "total",
+          "start_at",
+          "max_results"
+        ],
+        "title": "JiraSearchResponse",
+        "description": "Response model for JIRA issue search.",
+        "example": {
+          "issues": [
+            {
+              "id": "10001",
+              "issue_type": "Task",
+              "key": "PROJ-123",
+              "status": "Open",
+              "summary": "Test Issue",
+              "url": "https://yoursite.atlassian.net/browse/PROJ-123"
+            }
+          ],
+          "max_results": 50,
+          "start_at": 0,
+          "total": 1
+        }
+      },
+      "JiraUpdateIssueRequest": {
+        "properties": {
+          "jira_url": {
+            "type": "string",
+            "title": "Jira Url",
+            "description": "JIRA base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token"
+          },
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields",
+            "description": "Issue fields to update in JIRA format (transparently passed to JIRA API)"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is JIRA Cloud (vs Server/Data Center)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jira_url",
+          "token",
+          "fields"
+        ],
+        "title": "JiraUpdateIssueRequest",
+        "description": "Request model for updating a JIRA issue with transparent JIRA data format.",
+        "example": {
+          "cloud": true,
+          "fields": {
+            "assignee": {
+              "accountId": "5d5f0..."
+            },
+            "description": "Updated description text",
+            "labels": [
+              "label1",
+              "label2"
+            ],
+            "priority": {
+              "name": "High"
+            },
+            "summary": "Updated Summary"
+          },
+          "jira_url": "https://yoursite.atlassian.net",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "JiraUserInfo": {
+        "properties": {
+          "account_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Id",
+            "description": "User account ID (Cloud)"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Username (Server)"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "Display name"
+          },
+          "email_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Address",
+            "description": "Email address"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "description": "Whether the user is active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_name"
+        ],
+        "title": "JiraUserInfo",
+        "description": "Model for a JIRA user.",
+        "example": {
+          "account_id": "5d5f0...",
+          "active": true,
+          "display_name": "Max Mustermann",
+          "email_address": "max@company.com"
+        }
+      },
+      "JiraUsersRequest": {
+        "properties": {
+          "jira_url": {
+            "type": "string",
+            "title": "Jira Url",
+            "description": "JIRA base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "description": "Search term (username, display name, or email)"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project",
+            "description": "Optional project key to find assignable users"
+          },
+          "max_results": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Results",
+            "description": "Maximum number of results",
+            "default": 50
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is JIRA Cloud (vs Server/Data Center)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jira_url",
+          "token",
+          "query"
+        ],
+        "title": "JiraUsersRequest",
+        "description": "Request model for searching JIRA users.",
+        "example": {
+          "cloud": true,
+          "jira_url": "https://yoursite.atlassian.net",
+          "max_results": 50,
+          "project": "SCH",
+          "query": "max.mustermann",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "JiraUsersResponse": {
+        "properties": {
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/JiraUserInfo"
+            },
+            "type": "array",
+            "title": "Users",
+            "description": "List of found users"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of users found"
+          }
+        },
+        "type": "object",
+        "required": [
+          "users",
+          "total"
+        ],
+        "title": "JiraUsersResponse",
+        "description": "Response model for user search.",
+        "example": {
+          "total": 1,
+          "users": [
+            {
+              "account_id": "5d5f0...",
+              "active": true,
+              "display_name": "Max Mustermann",
+              "email_address": "max@company.com"
+            }
+          ]
+        }
+      },
+      "PageDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Page ID"
           },
           "title": {
             "type": "string",
             "title": "Title",
             "description": "Page title"
+          },
+          "space_key": {
+            "type": "string",
+            "title": "Space Key",
+            "description": "Space key"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Page URL"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Page version number"
           },
           "parent_id": {
             "anyOf": [
@@ -239,32 +2018,96 @@
               }
             ],
             "title": "Parent Id",
-            "description": "Parent page ID (optional)"
+            "description": "Parent page ID"
           },
-          "cloud": {
-            "type": "boolean",
-            "title": "Cloud",
-            "description": "Whether this is Confluence Cloud (vs Server)",
-            "default": true
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Creation timestamp"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "Last update timestamp"
           }
         },
         "type": "object",
         "required": [
-          "markdown",
-          "confluence_url",
-          "token",
-          "space",
-          "title"
+          "id",
+          "title",
+          "space_key",
+          "version"
         ],
-        "title": "PublishRequest",
-        "description": "Request model for publishing to Confluence.",
+        "title": "PageDetailResponse",
+        "description": "Response model for page details.",
         "example": {
-          "cloud": true,
-          "confluence_url": "https://your-domain.atlassian.net/wiki",
-          "markdown": "# My Documentation\n\nThis is my content.",
-          "space": "DEMO",
-          "title": "My Page",
-          "token": "YOUR_TOKEN_HERE"
+          "created_at": "2024-01-01T12:00:00.000Z",
+          "id": "123456",
+          "parent_id": "123455",
+          "space_key": "DEMO",
+          "title": "My Documentation Page",
+          "updated_at": "2024-01-15T14:30:00.000Z",
+          "url": "/wiki/spaces/DEMO/pages/123456",
+          "version": 5
+        }
+      },
+      "PageInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Page ID"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Page title"
+          },
+          "space_key": {
+            "type": "string",
+            "title": "Space Key",
+            "description": "Space key"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Page URL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "space_key"
+        ],
+        "title": "PageInfo",
+        "description": "Model for a single page.",
+        "example": {
+          "id": "123456",
+          "space_key": "DEMO",
+          "title": "My Documentation Page",
+          "url": "/wiki/spaces/DEMO/pages/123456"
         }
       },
       "PublishResponse": {
@@ -293,6 +2136,42 @@
             "type": "integer",
             "title": "Version",
             "description": "Page version number"
+          },
+          "last_modified": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Modified",
+            "description": "Last modification timestamp (ISO 8601 format)"
+          },
+          "modified_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified By",
+            "description": "User who last modified the page"
+          },
+          "attachments_uploaded": {
+            "type": "integer",
+            "title": "Attachments Uploaded",
+            "description": "Number of attachments uploaded",
+            "default": 0
+          },
+          "attachments_failed": {
+            "type": "integer",
+            "title": "Attachments Failed",
+            "description": "Number of attachments that failed to upload",
+            "default": 0
           }
         },
         "type": "object",
@@ -306,11 +2185,303 @@
         "title": "PublishResponse",
         "description": "Response model for publishing to Confluence.",
         "example": {
+          "attachments_failed": 0,
+          "attachments_uploaded": 2,
+          "last_modified": "2025-01-23T12:34:56.789Z",
+          "modified_by": "john.doe@example.com",
           "page_id": "123456",
           "page_url": "https://your-domain.atlassian.net/wiki/spaces/DEMO/pages/123456",
           "space": "DEMO",
           "title": "My Page",
           "version": 1
+        }
+      },
+      "SearchPagesRequest": {
+        "properties": {
+          "confluence_url": {
+            "type": "string",
+            "title": "Confluence Url",
+            "description": "Confluence base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token or API token"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is Confluence Cloud (vs Server)",
+            "default": true
+          },
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "description": "Search query for page title or content"
+          },
+          "space": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Space",
+            "description": "Optional space key to restrict search"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Maximum number of pages to return",
+            "default": 25
+          }
+        },
+        "type": "object",
+        "required": [
+          "confluence_url",
+          "token",
+          "query"
+        ],
+        "title": "SearchPagesRequest",
+        "description": "Request model for searching pages.",
+        "example": {
+          "cloud": true,
+          "confluence_url": "https://your-domain.atlassian.net/wiki",
+          "limit": 25,
+          "query": "documentation",
+          "space": "DEMO",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "SearchPagesResponse": {
+        "properties": {
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageInfo"
+            },
+            "type": "array",
+            "title": "Pages",
+            "description": "List of found pages"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of pages found"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pages",
+          "total"
+        ],
+        "title": "SearchPagesResponse",
+        "description": "Response model for searching pages.",
+        "example": {
+          "pages": [
+            {
+              "id": "123456",
+              "space_key": "DEMO",
+              "title": "My Documentation Page",
+              "url": "/wiki/spaces/DEMO/pages/123456"
+            }
+          ],
+          "total": 1
+        }
+      },
+      "SpaceDetailResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Space key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Space name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Space type (global, personal)"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Space URL"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Space description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "type"
+        ],
+        "title": "SpaceDetailResponse",
+        "description": "Response model for space details.",
+        "example": {
+          "description": "This is a demo space for testing",
+          "key": "DEMO",
+          "name": "Demo Space",
+          "type": "global",
+          "url": "/wiki/spaces/DEMO"
+        }
+      },
+      "SpaceInfo": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Space key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Space name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Space type (global, personal)"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "Space URL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "type"
+        ],
+        "title": "SpaceInfo",
+        "description": "Model for a single space.",
+        "example": {
+          "key": "DEMO",
+          "name": "Demo Space",
+          "type": "global",
+          "url": "/wiki/spaces/DEMO"
+        }
+      },
+      "SpacesRequest": {
+        "properties": {
+          "confluence_url": {
+            "type": "string",
+            "title": "Confluence Url",
+            "description": "Confluence base URL"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "description": "Personal Access Token or API token"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud",
+            "description": "Whether this is Confluence Cloud (vs Server)",
+            "default": true
+          },
+          "search": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search",
+            "description": "Optional search filter for space name or key"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Maximum number of spaces to return",
+            "default": 25
+          }
+        },
+        "type": "object",
+        "required": [
+          "confluence_url",
+          "token"
+        ],
+        "title": "SpacesRequest",
+        "description": "Request model for listing spaces.",
+        "example": {
+          "cloud": true,
+          "confluence_url": "https://your-domain.atlassian.net/wiki",
+          "limit": 25,
+          "search": "DEMO",
+          "token": "YOUR_TOKEN_HERE"
+        }
+      },
+      "SpacesResponse": {
+        "properties": {
+          "spaces": {
+            "items": {
+              "$ref": "#/components/schemas/SpaceInfo"
+            },
+            "type": "array",
+            "title": "Spaces",
+            "description": "List of accessible spaces"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of spaces returned"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spaces",
+          "total"
+        ],
+        "title": "SpacesResponse",
+        "description": "Response model for listing spaces.",
+        "example": {
+          "spaces": [
+            {
+              "key": "DEMO",
+              "name": "Demo Space",
+              "type": "global",
+              "url": "/wiki/spaces/DEMO"
+            }
+          ],
+          "total": 1
         }
       },
       "ValidationError": {

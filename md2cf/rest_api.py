@@ -6,6 +6,7 @@ to Confluence Storage Format and publishing to Confluence.
 """
 
 import logging
+import json
 import re
 from typing import Any, Dict, List, Optional
 
@@ -319,13 +320,11 @@ class JiraCreateIssueRequest(BaseModel):
     token: str = Field(..., description="Personal Access Token")
     project: str = Field(..., description="Project key (e.g., DEMO)")
     summary: str = Field(..., description="Issue summary/title")
-    description: str = Field(default="", description="Issue description")
-    issue_type: str = Field(default="Task", description="Issue type (e.g., Task, Bug, Story)")
-    priority: Optional[str] = Field(None, description="Priority (e.g., High, Medium, Low)")
-    assignee: Optional[str] = Field(None, description="Assignee username/email or account ID")
-    labels: Optional[List[str]] = Field(None, description="List of labels")
-    custom_fields: Optional[Dict[str, Any]] = Field(None, description="Custom fields dictionary")
+    issue_type: str = Field(..., description="Issue type JSON object, e.g., '{\"id\": \"90\"}'")
+    parent_key: Optional[str] = Field(None, description="Key of the parent issue for sub-tasks")
+    fields: Optional[str] = Field(None, description="A JSON string containing all other fields for the issue.")
     cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+    convert_markdown: bool = Field(True, description="Whether to convert description from Markdown to Jira Wiki Markup")
 
     class Config:
         json_schema_extra = {
@@ -333,11 +332,35 @@ class JiraCreateIssueRequest(BaseModel):
                 "jira_url": "https://yoursite.atlassian.net",
                 "token": "YOUR_TOKEN_HERE",
                 "project": "DEMO",
-                "summary": "Test Issue",
-                "description": "This is a test issue",
-                "issue_type": "Task",
-                "priority": "Medium",
-                "labels": ["test", "automation"],
+                "summary": "Dynamic Issue",
+                "issue_type": "{\"id\": \"10001\"}",
+                "parent_key": "PROJ-123",
+                "fields": "{\"description\": \"This is a description.\", \"priority\": {\"id\": \"2\"}, \"labels\": [\"dynamic\", \"api\"]}",
+                "cloud": False
+            }
+        }
+
+
+class JiraUpdateIssueRequest(BaseModel):
+    """Request model for updating a JIRA issue with transparent JIRA data format."""
+
+    jira_url: str = Field(..., description="JIRA base URL")
+    token: str = Field(..., description="Personal Access Token")
+    fields: Dict[str, Any] = Field(..., description="Issue fields to update in JIRA format (transparently passed to JIRA API)")
+    cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "jira_url": "https://yoursite.atlassian.net",
+                "token": "YOUR_TOKEN_HERE",
+                "fields": {
+                    "summary": "Updated Summary",
+                    "description": "Updated description text",
+                    "priority": {"name": "High"},
+                    "assignee": {"accountId": "5d5f0..."},
+                    "labels": ["label1", "label2"]
+                },
                 "cloud": True
             }
         }
@@ -356,6 +379,8 @@ class JiraIssueResponse(BaseModel):
     assignee: Optional[str] = Field(None, description="Assignee name")
     created: Optional[str] = Field(None, description="Creation timestamp")
     updated: Optional[str] = Field(None, description="Last update timestamp")
+    attachments_uploaded: int = Field(0, description="Number of attachments uploaded")
+    attachments_failed: int = Field(0, description="Number of attachments that failed to upload")
 
     class Config:
         json_schema_extra = {
@@ -369,7 +394,48 @@ class JiraIssueResponse(BaseModel):
                 "priority": "Medium",
                 "assignee": "John Doe",
                 "created": "2025-01-23T12:00:00.000+0000",
-                "updated": "2025-01-23T14:30:00.000+0000"
+                "updated": "2025-01-23T14:30:00.000+0000",
+                "attachments_uploaded": 2,
+                "attachments_failed": 0
+            }
+        }
+
+
+class JiraIssueDetailResponse(BaseModel):
+    """Response model for JIRA issue details with complete raw data from JIRA API."""
+
+    # Core issue identification
+    key: str = Field(..., description="Issue key (e.g., PROJ-123)")
+    id: str = Field(..., description="Issue ID")
+    self: str = Field(..., description="JIRA REST API URL for this issue")
+    url: str = Field(..., description="Browser URL to view the issue")
+
+    # Complete fields object from JIRA
+    fields: Dict[str, Any] = Field(..., description="All issue fields as returned by JIRA API")
+
+    # Additional metadata if available
+    expand: Optional[str] = Field(None, description="Expanded properties")
+    transitions: Optional[List[Dict[str, Any]]] = Field(None, description="Available transitions if requested")
+    changelog: Optional[Dict[str, Any]] = Field(None, description="Change history if requested")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "key": "PROJ-123",
+                "id": "10001",
+                "self": "https://yoursite.atlassian.net/rest/api/2/issue/10001",
+                "url": "https://yoursite.atlassian.net/browse/PROJ-123",
+                "fields": {
+                    "summary": "Test Issue",
+                    "status": {"name": "Open", "id": "1"},
+                    "issuetype": {"name": "Task", "id": "10"},
+                    "priority": {"name": "Medium", "id": "3"},
+                    "assignee": {"displayName": "John Doe", "accountId": "abc123"},
+                    "created": "2025-01-23T12:00:00.000+0000",
+                    "updated": "2025-01-23T14:30:00.000+0000",
+                    "description": "This is a test issue"
+                },
+                "expand": "renderedFields,names,schema"
             }
         }
 
@@ -494,6 +560,230 @@ class JiraProjectsResponse(BaseModel):
                         "key": "DEMO",
                         "name": "Demo Project",
                         "project_type": "software"
+                    }
+                ],
+                "total": 1
+            }
+        }
+
+
+# JIRA Metadata Models
+
+class JiraCreateMetaRequest(BaseModel):
+    """Request model for getting issue creation metadata."""
+
+    jira_url: str = Field(..., description="JIRA base URL")
+    token: str = Field(..., description="Personal Access Token")
+    project_keys: Optional[List[str]] = Field(None, description="Optional list of project keys to filter")
+    issue_type_names: Optional[List[str]] = Field(None, description="Optional list of issue type names to filter")
+    cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "jira_url": "https://yoursite.atlassian.net",
+                "token": "YOUR_TOKEN_HERE",
+                "project_keys": ["SCH", "FM"],
+                "issue_type_names": ["Story", "Bug"],
+                "cloud": True
+            }
+        }
+
+
+class JiraCreateMetaResponse(BaseModel):
+    """Response model for issue creation metadata."""
+
+    projects: List[Dict[str, Any]] = Field(..., description="List of projects with issue types and field definitions")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "projects": [
+                    {
+                        "key": "SCH",
+                        "name": "Schaden",
+                        "issuetypes": [
+                            {
+                                "id": "10001",
+                                "name": "Story",
+                                "fields": {
+                                    "summary": {"required": True, "schema": {"type": "string"}},
+                                    "assignee": {"required": False, "allowedValues": []},
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+
+class JiraUsersRequest(BaseModel):
+    """Request model for searching JIRA users."""
+
+    jira_url: str = Field(..., description="JIRA base URL")
+    token: str = Field(..., description="Personal Access Token")
+    query: str = Field(..., description="Search term (username, display name, or email)")
+    project: Optional[str] = Field(None, description="Optional project key to find assignable users")
+    max_results: int = Field(50, ge=1, le=100, description="Maximum number of results")
+    cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "jira_url": "https://yoursite.atlassian.net",
+                "token": "YOUR_TOKEN_HERE",
+                "query": "max.mustermann",
+                "project": "SCH",
+                "max_results": 50,
+                "cloud": True
+            }
+        }
+
+
+class JiraUserInfo(BaseModel):
+    """Model for a JIRA user."""
+
+    account_id: Optional[str] = Field(None, description="User account ID (Cloud)")
+    name: Optional[str] = Field(None, description="Username (Server)")
+    display_name: str = Field(..., description="Display name")
+    email_address: Optional[str] = Field(None, description="Email address")
+    active: bool = Field(True, description="Whether the user is active")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "account_id": "5d5f0...",
+                "display_name": "Max Mustermann",
+                "email_address": "max@company.com",
+                "active": True
+            }
+        }
+
+
+class JiraUsersResponse(BaseModel):
+    """Response model for user search."""
+
+    users: List[JiraUserInfo] = Field(..., description="List of found users")
+    total: int = Field(..., description="Total number of users found")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "users": [
+                    {
+                        "account_id": "5d5f0...",
+                        "display_name": "Max Mustermann",
+                        "email_address": "max@company.com",
+                        "active": True
+                    }
+                ],
+                "total": 1
+            }
+        }
+
+
+class JiraEditMetaRequest(BaseModel):
+    """Request model for getting issue edit metadata."""
+
+    jira_url: str = Field(..., description="JIRA base URL")
+    token: str = Field(..., description="Personal Access Token")
+    cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "jira_url": "https://yoursite.atlassian.net",
+                "token": "YOUR_TOKEN_HERE",
+                "cloud": True
+            }
+        }
+
+
+class JiraEditMetaResponse(BaseModel):
+    """Response model for issue edit metadata."""
+
+    fields: Dict[str, Any] = Field(..., description="Dictionary of editable fields with their definitions")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "fields": {
+                    "summary": {
+                        "required": True,
+                        "name": "Summary",
+                        "schema": {"type": "string"},
+                        "operations": ["set"]
+                    },
+                    "description": {
+                        "required": False,
+                        "name": "Description",
+                        "schema": {"type": "string"},
+                        "operations": ["set"]
+                    },
+                    "assignee": {
+                        "required": False,
+                        "name": "Assignee",
+                        "schema": {"type": "user"},
+                        "operations": ["set"],
+                        "allowedValues": []
+                    }
+                }
+            }
+        }
+
+
+class JiraFieldsRequest(BaseModel):
+    """Request model for getting JIRA fields."""
+
+    jira_url: str = Field(..., description="JIRA base URL")
+    token: str = Field(..., description="Personal Access Token")
+    cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "jira_url": "https://yoursite.atlassian.net",
+                "token": "YOUR_TOKEN_HERE",
+                "cloud": True
+            }
+        }
+
+
+class JiraFieldInfo(BaseModel):
+    """Model for a JIRA field."""
+
+    id: str = Field(..., description="Field ID")
+    name: str = Field(..., description="Field name")
+    custom: bool = Field(..., description="Whether this is a custom field")
+    schema_type: Optional[str] = Field(None, description="Field schema type")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "customfield_10001",
+                "name": "Story Points",
+                "custom": True,
+                "schema_type": "number"
+            }
+        }
+
+
+class JiraFieldsResponse(BaseModel):
+    """Response model for fields."""
+
+    fields: List[Dict[str, Any]] = Field(..., description="List of available fields")
+    total: int = Field(..., description="Total number of fields")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "fields": [
+                    {
+                        "id": "customfield_10001",
+                        "name": "Story Points",
+                        "custom": True,
+                        "schema": {"type": "number"}
                     }
                 ],
                 "total": 1
@@ -1068,21 +1358,74 @@ async def search_pages(request: SearchPagesRequest) -> SearchPagesResponse:
         )
 
 
+def jira_create_issue_form(
+    jira_url: str = Form(..., description="JIRA base URL"),
+    token: str = Form(..., description="Personal Access Token"),
+    project: str = Form(..., description="Project key (e.g., DEMO)"),
+    summary: str = Form(..., description="Issue summary/title"),
+    issue_type: str = Form(..., description="Issue type JSON object, e.g., '{\"id\": \"90\"}'"),
+    parent_key: Optional[str] = Form(None, description="Key of the parent issue for sub-tasks"),
+    fields: Optional[str] = Form(None, description="A JSON string containing all other fields for the issue."),
+    cloud: bool = Form(False, description="Whether this is JIRA Cloud (vs Server/Data Center)"),
+    convert_markdown: bool = Form(True, description="Whether to convert description from Markdown to Jira Wiki Markup"),
+) -> JiraCreateIssueRequest:
+    """Helper function to create JiraCreateIssueRequest from form data."""
+    return JiraCreateIssueRequest(
+        jira_url=jira_url,
+        token=token,
+        project=project,
+        summary=summary,
+        issue_type=issue_type,
+        parent_key=parent_key,
+        fields=fields,
+        cloud=cloud,
+        convert_markdown=convert_markdown,
+    )
+
+
 @app.post("/jira/create", response_model=JiraIssueResponse, status_code=status.HTTP_201_CREATED)
-async def create_jira_issue(request: JiraCreateIssueRequest) -> JiraIssueResponse:
+async def create_jira_issue(
+    request: JiraCreateIssueRequest = Depends(jira_create_issue_form),
+    attachments: List[UploadFile] = File(None),
+) -> JiraIssueResponse:
     """
-    Create a new JIRA issue.
+    Create a new JIRA issue with optional attachments.
+
+    This endpoint accepts:
+    - Issue details as form data (via JiraCreateIssueRequest model)
+    - Optional multiple file attachments
+    - JIRA connection details
 
     Args:
         request: JiraCreateIssueRequest containing issue details
+        attachments: Optional list of attachment files to upload (default: empty list)
 
     Returns:
-        JiraIssueResponse with the created issue information
+        JiraIssueResponse with the created issue information and attachment status
 
     Raises:
         HTTPException: If issue creation fails
     """
+    temp_dir = None
     try:
+        # Create a temporary directory for attachments
+        temp_dir = tempfile.mkdtemp()
+        attachment_paths = {}
+
+        # Save uploaded files to temp directory with their original filenames
+        # Handle case where attachments is None (no files uploaded)
+        for attachment in (attachments or []):
+            # Use original filename in temp directory
+            temp_path = PathLib(temp_dir) / attachment.filename
+
+            # Write uploaded content
+            content_bytes = await attachment.read()
+            temp_path.write_bytes(content_bytes)
+
+            # Store mapping of filename to temp path
+            attachment_paths[attachment.filename] = str(temp_path)
+            logger.info(f"Saved attachment: {attachment.filename} to {temp_path}")
+
         # Initialize JIRA client
         client = JiraClient(
             url=request.jira_url,
@@ -1090,46 +1433,160 @@ async def create_jira_issue(request: JiraCreateIssueRequest) -> JiraIssueRespons
             cloud=request.cloud
         )
 
-        # Create issue
+        # Parse the dynamic fields from the JSON string
+        fields_dict = {}
+        if request.fields:
+            try:
+                fields_dict = json.loads(request.fields)
+                if not isinstance(fields_dict, dict):
+                    raise ValueError("Fields must be a JSON object.")
+            except json.JSONDecodeError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid JSON format for fields"
+                )
+
         issue = client.create_issue(
             project=request.project,
             summary=request.summary,
-            description=request.description,
             issue_type=request.issue_type,
-            priority=request.priority,
-            assignee=request.assignee,
-            labels=request.labels,
-            custom_fields=request.custom_fields,
+            parent_key=request.parent_key,
+            fields=fields_dict,
+            convert_markdown=request.convert_markdown,
         )
 
-        issue_url = client.get_issue_url(issue["key"])
+        issue_key = issue["key"]
+        issue_url = client.get_issue_url(issue_key)
+        logger.info(f"Created JIRA issue: {issue_key}")
+
+        # Upload attachments
+        uploaded_count = 0
+        failed_count = 0
+
+        for filename, temp_path in attachment_paths.items():
+            try:
+                client.attach_file(
+                    issue_key=issue_key,
+                    file_path=temp_path,
+                    comment=f"Uploaded via REST API"
+                )
+                logger.info(f"Uploaded attachment to {issue_key}: {filename}")
+                uploaded_count += 1
+            except Exception as e:
+                logger.error(f"Failed to upload {filename} to {issue_key}: {e}")
+                failed_count += 1
 
         return JiraIssueResponse(
             key=issue["key"],
             id=issue["id"],
             url=issue_url,
             summary=request.summary,
+            attachments_uploaded=uploaded_count,
+            attachments_failed=failed_count
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to create JIRA issue: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create issue: {str(e)}"
         )
+    finally:
+        # Clean up temporary directory and all files
+        if temp_dir:
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                logger.info(f"Cleaned up temporary directory: {temp_dir}")
+            except Exception as e:
+                logger.error(f"Failed to delete temp directory {temp_dir}: {e}")
 
 
-@app.post("/jira/issue/{issue_key}", response_model=JiraIssueResponse, status_code=status.HTTP_200_OK)
-async def get_jira_issue(issue_key: str, request: JiraGetIssueRequest) -> JiraIssueResponse:
+@app.put("/jira/issue/{issue_key}", response_model=JiraIssueDetailResponse, status_code=status.HTTP_200_OK)
+async def update_jira_issue(issue_key: str, request: JiraUpdateIssueRequest) -> JiraIssueDetailResponse:
     """
-    Get a JIRA issue by key.
+    Update an existing JIRA issue with transparent data format.
+
+    This endpoint accepts the issue fields in the exact JIRA API format and passes
+    them transparently to the JIRA API without transformation. The caller is responsible
+    for providing the data in the correct JIRA format.
+
+    Args:
+        issue_key: The key of the issue to update (e.g., "PROJ-123")
+        request: JiraUpdateIssueRequest containing the fields to update in JIRA format
+
+    Returns:
+        JiraIssueDetailResponse with the complete updated issue information from JIRA
+
+    Raises:
+        HTTPException: If the issue is not found or the update fails
+
+    Example:
+        To update summary and priority:
+        {
+            "jira_url": "https://yoursite.atlassian.net",
+            "token": "YOUR_TOKEN",
+            "fields": {
+                "summary": "New Summary",
+                "priority": {"name": "High"}
+            },
+            "cloud": true
+        }
+    """
+    try:
+        client = JiraClient(
+            url=request.jira_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        if not request.fields:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fields provided to update."
+            )
+
+        # Pass fields transparently to JIRA API
+        client.update_issue(issue_key=issue_key, fields=request.fields)
+
+        # After updating, fetch the issue to return its latest state
+        updated_issue_detail = await get_jira_issue(
+            issue_key=issue_key,
+            request=JiraGetIssueRequest(
+                jira_url=request.jira_url,
+                token=request.token,
+                cloud=request.cloud
+            )
+        )
+
+        return updated_issue_detail
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update JIRA issue '{issue_key}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update issue: {str(e)}"
+        )
+
+
+@app.post("/jira/issue/{issue_key}", response_model=JiraIssueDetailResponse, status_code=status.HTTP_200_OK)
+async def get_jira_issue(issue_key: str, request: JiraGetIssueRequest) -> JiraIssueDetailResponse:
+    """
+    Get a JIRA issue by key with complete raw data from JIRA API.
+
+    This endpoint returns the complete issue data transparently as received
+    from JIRA, including all fields, metadata, and expanded properties.
 
     Args:
         issue_key: Issue key (e.g., PROJ-123)
         request: JiraGetIssueRequest containing JIRA credentials
 
     Returns:
-        JiraIssueResponse with issue details
+        JiraIssueDetailResponse with complete issue details from JIRA
 
     Raises:
         HTTPException: If issue not found or retrieval fails
@@ -1142,7 +1599,7 @@ async def get_jira_issue(issue_key: str, request: JiraGetIssueRequest) -> JiraIs
             cloud=request.cloud
         )
 
-        # Get issue
+        # Get issue with all fields
         issue = client.get_issue(issue_key)
 
         if not issue:
@@ -1151,26 +1608,19 @@ async def get_jira_issue(issue_key: str, request: JiraGetIssueRequest) -> JiraIs
                 detail=f"Issue '{issue_key}' not found"
             )
 
-        # Extract fields
-        fields = issue["fields"]
+        # Generate browser URL
         issue_url = client.get_issue_url(issue["key"])
 
-        assignee = fields.get("assignee")
-        assignee_name = None
-        if assignee:
-            assignee_name = assignee.get("displayName") or assignee.get("name")
-
-        return JiraIssueResponse(
+        # Return complete raw issue data transparently
+        return JiraIssueDetailResponse(
             key=issue["key"],
             id=issue["id"],
+            self=issue.get("self", ""),
             url=issue_url,
-            summary=fields["summary"],
-            status=fields["status"]["name"],
-            issue_type=fields["issuetype"]["name"],
-            priority=fields.get("priority", {}).get("name"),
-            assignee=assignee_name,
-            created=fields.get("created"),
-            updated=fields.get("updated"),
+            fields=issue.get("fields", {}),
+            expand=issue.get("expand"),
+            transitions=issue.get("transitions"),
+            changelog=issue.get("changelog"),
         )
 
     except HTTPException:
@@ -1281,6 +1731,8 @@ async def list_jira_projects(request: JiraProjectsRequest) -> JiraProjectsRespon
             cloud=request.cloud
         )
 
+        print("Fetching JIRA projects...", request.token)
+
         # Get projects
         projects = client.get_projects(include_archived=request.include_archived)
 
@@ -1301,10 +1753,228 @@ async def list_jira_projects(request: JiraProjectsRequest) -> JiraProjectsRespon
         )
 
     except Exception as e:
-        logger.error(f"Failed to list JIRA projects: {e}")
+        # Better error logging
+        error_msg = str(e) if str(e) else repr(e)
+        logger.error(f"Failed to list JIRA projects: {error_msg}")
+        logger.error(f"Exception type: {type(e).__name__}")
+
+        # Try to extract more details from HTTPError
+        detail_msg = f"Failed to list projects: {error_msg if error_msg else type(e).__name__}"
+        if hasattr(e, 'response'):
+            status_code = getattr(e.response, 'status_code', None)
+            response_text = getattr(e.response, 'text', None)
+            if status_code:
+                detail_msg += f" (HTTP {status_code})"
+            if response_text:
+                logger.error(f"Response: {response_text[:500]}")  # Log first 500 chars
+                detail_msg += f" - {response_text[:200]}"  # Include first 200 chars in error
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list projects: {str(e)}"
+            detail=detail_msg
+        )
+
+
+@app.post("/jira/create-meta", response_model=JiraCreateMetaResponse, status_code=status.HTTP_200_OK)
+async def get_jira_create_meta(request: JiraCreateMetaRequest) -> JiraCreateMetaResponse:
+    """
+    Get metadata for creating JIRA issues (fields, allowed values, etc.).
+
+    This endpoint provides information about:
+    - Available issue types for each project
+    - Required and optional fields for each issue type
+    - Allowed values for fields (e.g., priorities, statuses)
+    - Custom field definitions
+
+    Args:
+        request: JiraCreateMetaRequest containing JIRA credentials and optional filters
+
+    Returns:
+        JiraCreateMetaResponse with project and issue type metadata
+
+    Raises:
+        HTTPException: If metadata retrieval fails
+    """
+    try:
+        # Initialize JIRA client
+        client = JiraClient(
+            url=request.jira_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Get create issue metadata
+        result = client.get_create_issue_meta(
+            project_keys=request.project_keys,
+            issue_type_names=request.issue_type_names,
+        )
+
+        return JiraCreateMetaResponse(
+            projects=result.get("projects", [])
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get JIRA create metadata: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get create metadata: {str(e)}"
+        )
+
+
+@app.post("/jira/issue/{issue_key}/edit-meta", response_model=JiraEditMetaResponse, status_code=status.HTTP_200_OK)
+async def get_jira_edit_meta(issue_key: str, request: JiraEditMetaRequest) -> JiraEditMetaResponse:
+    """
+    Get metadata for editing a JIRA issue (fields, allowed values, etc.).
+
+    This endpoint provides information about:
+    - Editable fields for the specific issue
+    - Required and optional fields
+    - Allowed values for fields (e.g., priorities, statuses)
+    - Field operations (set, add, remove, etc.)
+
+    Args:
+        issue_key: Issue key (e.g., PROJ-123)
+        request: JiraEditMetaRequest containing JIRA credentials
+
+    Returns:
+        JiraEditMetaResponse with field metadata for editing
+
+    Raises:
+        HTTPException: If metadata retrieval fails
+    """
+    try:
+        # Initialize JIRA client
+        client = JiraClient(
+            url=request.jira_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Get edit issue metadata
+        result = client.get_edit_issue_meta(issue_key=issue_key)
+
+        return JiraEditMetaResponse(
+            fields=result.get("fields", {})
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get JIRA edit metadata for issue '{issue_key}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get edit metadata: {str(e)}"
+        )
+
+
+@app.post("/jira/users", response_model=JiraUsersResponse, status_code=status.HTTP_200_OK)
+async def search_jira_users(request: JiraUsersRequest) -> JiraUsersResponse:
+    """
+    Search for JIRA users (for assignee selection).
+
+    This endpoint allows searching for users by username, display name, or email.
+    Optionally filter by project to get only assignable users for that project.
+    If the query is empty but a project is provided, it returns all assignable
+    users for that project.
+
+    Args:
+        request: JiraUsersRequest containing search query and optional project filter
+
+    Returns:
+        JiraUsersResponse with list of matching users
+
+    Raises:
+        HTTPException: If user search fails
+    """
+    try:
+        # If no project is specified, a query is required.
+        query = request.query.strip() if request.query else ""
+        if not request.project and not query:
+            logger.warning("User search requires a project or a query.")
+            return JiraUsersResponse(users=[], total=0)
+
+        # Initialize JIRA client
+        client = JiraClient(
+            url=request.jira_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # The client's search_users method will handle the logic of filtering
+        # by query if it's provided, or returning all if it's empty.
+        users = client.search_users(
+            query=query,
+            project=request.project,
+            max_results=request.max_results,
+        )
+
+        # Convert user data to response format
+        user_list = []
+        for user in users:
+            # Ensure user is a dictionary before processing
+            if not isinstance(user, dict):
+                logger.warning(f"Skipping non-dictionary user entry: {type(user)} - {user}")
+                continue
+
+            user_list.append(
+                JiraUserInfo(
+                    account_id=user.get("accountId"),
+                    name=user.get("name"),
+                    display_name=user.get("displayName", ""),
+                    email_address=user.get("emailAddress"),
+                    active=user.get("active", True),
+                )
+            )
+
+        return JiraUsersResponse(
+            users=user_list,
+            total=len(user_list)
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to search JIRA users: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to search users: {str(e)}"
+        )
+
+
+@app.post("/jira/fields", response_model=JiraFieldsResponse, status_code=status.HTTP_200_OK)
+async def get_jira_fields(request: JiraFieldsRequest) -> JiraFieldsResponse:
+    """
+    Get all available JIRA fields (including custom fields).
+
+    This endpoint provides information about all fields available in JIRA,
+    including system fields and custom fields with their types and properties.
+
+    Args:
+        request: JiraFieldsRequest containing JIRA credentials
+
+    Returns:
+        JiraFieldsResponse with list of all fields
+
+    Raises:
+        HTTPException: If fields retrieval fails
+    """
+    try:
+        # Initialize JIRA client
+        client = JiraClient(
+            url=request.jira_url,
+            token=request.token,
+            cloud=request.cloud
+        )
+
+        # Get all fields
+        fields = client.get_fields()
+
+        return JiraFieldsResponse(
+            fields=fields,
+            total=len(fields)
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to get JIRA fields: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get fields: {str(e)}"
         )
 
 

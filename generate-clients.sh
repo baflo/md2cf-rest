@@ -28,6 +28,8 @@ curl -s $API_URL > openapi.json
 echo "✅ Schema gespeichert: openapi.json"
 echo ""
 
+function openapi-generator-cli() { docker run --network=host openapitools/openapi-generator-cli $@ ; }
+
 # Prüfe ob OpenAPI Generator installiert ist
 if ! command -v openapi-generator-cli &> /dev/null; then
     echo "⚠️  OpenAPI Generator CLI ist nicht installiert."
