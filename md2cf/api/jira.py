@@ -216,14 +216,18 @@ class JiraClient:
         """
         try:
             logger.info(f"Searching issues with JQL: {jql}")
+            print(f"Start: {start}, Limit: {limit}, Fields: {fields or 'default'}")
 
             # Use the jql method from atlassian-python-api
             result = self.jira.jql(
                 jql=jql,
-                fields=fields or "summary,status,issuetype,assignee,priority,created,updated",
+                # fields=fields or "summary,status,issuetype,assignee,priority,created,updated",
+                fields=fields or None,
                 start=start,
                 limit=limit,
             )
+
+            print(result)
 
             if result is None:
                 logger.warning("JQL search returned None")
@@ -717,10 +721,12 @@ class JiraClient:
         try:
             # Try project-specific assignable users API
             all_assignable = self.jira.get_all_assignable_users_for_project(
-                project_key=project,
+                project_key=f"{project}&username=Florian Bachmann",
                 start=0,
                 limit=max_results
             )
+
+            print("search_query", search_query)
 
             if not all_assignable:
                 raise ValueError("No users returned from project-specific search")

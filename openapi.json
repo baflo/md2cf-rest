@@ -1655,6 +1655,69 @@
           "total": 1
         }
       },
+      "JiraSearchIssue": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Issue key (e.g., PROJ-123)"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Issue ID"
+          },
+          "self": {
+            "type": "string",
+            "title": "Self",
+            "description": "JIRA REST API URL for this issue"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Browser URL to view the issue"
+          },
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields",
+            "description": "All issue fields as returned by JIRA API"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "id",
+          "self",
+          "url",
+          "fields"
+        ],
+        "title": "JiraSearchIssue",
+        "description": "Model for a single issue in search results with transparent field access.",
+        "example": {
+          "fields": {
+            "created": "2025-01-23T12:00:00.000+0000",
+            "issuetype": {
+              "id": "10",
+              "name": "Task"
+            },
+            "priority": {
+              "id": "3",
+              "name": "Medium"
+            },
+            "status": {
+              "id": "1",
+              "name": "Open"
+            },
+            "summary": "Test Issue",
+            "updated": "2025-01-23T14:30:00.000+0000"
+          },
+          "id": "10001",
+          "key": "PROJ-123",
+          "self": "https://yoursite.atlassian.net/rest/api/2/issue/10001",
+          "url": "https://yoursite.atlassian.net/browse/PROJ-123"
+        }
+      },
       "JiraSearchRequest": {
         "properties": {
           "jira_url": {
@@ -1687,6 +1750,18 @@
             "description": "Maximum number of results",
             "default": 50
           },
+          "fields": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields",
+            "description": "Comma-separated list of fields to include (e.g., \"summary,status,assignee\"). If not specified, returns default fields."
+          },
           "cloud": {
             "type": "boolean",
             "title": "Cloud",
@@ -1704,6 +1779,7 @@
         "description": "Request model for searching JIRA issues.",
         "example": {
           "cloud": true,
+          "fields": "summary,status,assignee,priority,created,updated",
           "jira_url": "https://yoursite.atlassian.net",
           "jql": "project = DEMO AND status = Open",
           "limit": 50,
@@ -1715,7 +1791,7 @@
         "properties": {
           "issues": {
             "items": {
-              "$ref": "#/components/schemas/JiraIssueResponse"
+              "$ref": "#/components/schemas/JiraSearchIssue"
             },
             "type": "array",
             "title": "Issues",
@@ -1745,15 +1821,22 @@
           "max_results"
         ],
         "title": "JiraSearchResponse",
-        "description": "Response model for JIRA issue search.",
+        "description": "Response model for JIRA issue search with transparent field access.",
         "example": {
           "issues": [
             {
+              "fields": {
+                "issuetype": {
+                  "name": "Task"
+                },
+                "status": {
+                  "name": "Open"
+                },
+                "summary": "Test Issue"
+              },
               "id": "10001",
-              "issue_type": "Task",
               "key": "PROJ-123",
-              "status": "Open",
-              "summary": "Test Issue",
+              "self": "https://yoursite.atlassian.net/rest/api/2/issue/10001",
               "url": "https://yoursite.atlassian.net/browse/PROJ-123"
             }
           ],

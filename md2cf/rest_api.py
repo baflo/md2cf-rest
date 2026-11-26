@@ -465,6 +465,7 @@ class JiraSearchRequest(BaseModel):
     jql: str = Field(..., description='JQL query (e.g., "project = DEMO AND status = Open")')
     start: int = Field(0, ge=0, description="Starting index for pagination")
     limit: int = Field(50, ge=1, le=100, description="Maximum number of results")
+    fields: Optional[str] = Field(None, description='Comma-separated list of fields to include (e.g., "summary,status,assignee"). If not specified, returns default fields.')
     cloud: bool = Field(False, description="Whether this is JIRA Cloud (vs Server/Data Center)")
 
     class Config:
@@ -475,15 +476,44 @@ class JiraSearchRequest(BaseModel):
                 "jql": "project = DEMO AND status = Open",
                 "start": 0,
                 "limit": 50,
+                "fields": "summary,status,assignee,priority,created,updated",
                 "cloud": True
             }
         }
 
 
-class JiraSearchResponse(BaseModel):
-    """Response model for JIRA issue search."""
+class JiraSearchIssue(BaseModel):
+    """Model for a single issue in search results with transparent field access."""
 
-    issues: List[JiraIssueResponse] = Field(..., description="List of found issues")
+    key: str = Field(..., description="Issue key (e.g., PROJ-123)")
+    id: str = Field(..., description="Issue ID")
+    self: str = Field(..., description="JIRA REST API URL for this issue")
+    url: str = Field(..., description="Browser URL to view the issue")
+    fields: Dict[str, Any] = Field(..., description="All issue fields as returned by JIRA API")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "key": "PROJ-123",
+                "id": "10001",
+                "self": "https://yoursite.atlassian.net/rest/api/2/issue/10001",
+                "url": "https://yoursite.atlassian.net/browse/PROJ-123",
+                "fields": {
+                    "summary": "Test Issue",
+                    "status": {"name": "Open", "id": "1"},
+                    "issuetype": {"name": "Task", "id": "10"},
+                    "priority": {"name": "Medium", "id": "3"},
+                    "created": "2025-01-23T12:00:00.000+0000",
+                    "updated": "2025-01-23T14:30:00.000+0000"
+                }
+            }
+        }
+
+
+class JiraSearchResponse(BaseModel):
+    """Response model for JIRA issue search with transparent field access."""
+
+    issues: List[JiraSearchIssue] = Field(..., description="List of found issues")
     total: int = Field(..., description="Total number of issues found")
     start_at: int = Field(..., description="Starting index")
     max_results: int = Field(..., description="Maximum results per page")
@@ -495,10 +525,13 @@ class JiraSearchResponse(BaseModel):
                     {
                         "key": "PROJ-123",
                         "id": "10001",
+                        "self": "https://yoursite.atlassian.net/rest/api/2/issue/10001",
                         "url": "https://yoursite.atlassian.net/browse/PROJ-123",
-                        "summary": "Test Issue",
-                        "status": "Open",
-                        "issue_type": "Task"
+                        "fields": {
+                            "summary": "Test Issue",
+                            "status": {"name": "Open"},
+                            "issuetype": {"name": "Task"}
+                        }
                     }
                 ],
                 "total": 1,
@@ -1660,32 +1693,22 @@ async def search_jira_issues(request: JiraSearchRequest) -> JiraSearchResponse:
             jql=request.jql,
             start=request.start,
             limit=request.limit,
+            fields=request.fields,
         )
 
         issues = result.get("issues", [])
         issue_list = []
 
         for issue in issues:
-            fields = issue["fields"]
             issue_url = client.get_issue_url(issue["key"])
 
-            assignee = fields.get("assignee")
-            assignee_name = None
-            if assignee:
-                assignee_name = assignee.get("displayName") or assignee.get("name")
-
             issue_list.append(
-                JiraIssueResponse(
+                JiraSearchIssue(
                     key=issue["key"],
                     id=issue["id"],
+                    self=issue.get("self", ""),
                     url=issue_url,
-                    summary=fields.get("summary"),
-                    status=fields.get("status", {}).get("name"),
-                    issue_type=fields.get("issuetype", {}).get("name"),
-                    priority=fields.get("priority", {}).get("name"),
-                    assignee=assignee_name,
-                    created=fields.get("created"),
-                    updated=fields.get("updated"),
+                    fields=issue.get("fields", {}),
                 )
             )
 

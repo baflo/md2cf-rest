@@ -210,6 +210,11 @@ class ConfluenceMacroParser:
             # Use rich-text-body for admonitions to allow markdown formatting
             body_type = 'rich-text-body'
 
+            # Replace single newlines with <br> to preserve line breaks,
+            # but only if the line before the newline has actual content (not just whitespace)
+            # This prevents adding <br> after empty lines like "> "
+            content = re.sub(r'(\S)\n(?!\n)', r'\1<br>\n', content)
+
             # Mark content for markdown conversion
             macro_html = self._generate_macro_html(macro_name, params, content, body_type, convert_markdown=True)
 
