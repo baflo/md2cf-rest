@@ -170,6 +170,21 @@ API Dokumentation: http://localhost:8000/docs
 - `POST /jira/search` - Suche Issues mit JQL
 - `POST /jira/projects` - Liste Projekte
 
+*JIRA-Proxy:*
+- `GET|POST|PUT|PATCH|DELETE /jira/proxy/{pfad}` – reicht Anfragen unverändert an `$JIRA_URL/{pfad}` durch
+
+Gedacht für Browser-Clients wie Super Productivity, die Jira wegen CORS nicht direkt
+ansprechen können. Als Jira-URL im Client `https://<md2cf-host>/jira/proxy` eintragen.
+
+- Der `Authorization`-Header (Bearer-PAT oder Basic mit Benutzer:Token) wird 1:1 weitergeleitet.
+- `X-Atlassian-Token: no-check` wird immer gesetzt.
+- Weiterleitungen und Cookies von Jira werden auf `/jira/proxy/` umgeschrieben.
+- Antworten (auch Anhänge) werden gestreamt; TLS wird gegen das System-CA-Bundle geprüft.
+- Das Ziel kommt ausschließlich aus `JIRA_URL` (ohne gesetzte Variable: HTTP 503).
+
+Da der Proxy Cookies weiterleitet, sollten die erlaubten CORS-Origins eingeschränkt werden
+(siehe `CORS_ALLOW_ORIGINS` / `CORS_ALLOW_ORIGIN_REGEX` unten).
+
 Siehe [REST API Docs](docs/rest-api.md) für Details.
 
 ## Unterstützte Markdown Features
@@ -231,6 +246,14 @@ export CONFLUENCE_SPACE="DEMO"  # Optional: Default Space
 ```bash
 export JIRA_URL="https://your-domain.atlassian.net"
 export JIRA_TOKEN="your-jira-personal-access-token"
+```
+
+### REST API / CORS
+```bash
+# Komma-getrennte Liste erlaubter Origins (Default: "*")
+export CORS_ALLOW_ORIGINS="https://superprod.localhost"
+# Alternativ/zusätzlich als Regex, z. B. mit beliebigem Port
+export CORS_ALLOW_ORIGIN_REGEX='^https://superprod\.localhost(:[0-9]+)?$'
 ```
 
 ## Personal Access Token erstellen

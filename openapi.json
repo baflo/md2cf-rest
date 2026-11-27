@@ -6,6 +6,242 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/jira/proxy/{jira_path}": {
+      "delete": {
+        "tags": [
+          "jira-proxy"
+        ],
+        "summary": "Transparent JIRA proxy",
+        "description": "Forward the request unchanged to ``$JIRA_URL/<jira_path>``.\n\nSend the same headers as to JIRA itself, e.g.\n``Authorization: Bearer <PAT>`` or ``Authorization: Basic <base64(user:token)>``.",
+        "operationId": "proxy_jira_jira_proxy__jira_path__delete",
+        "parameters": [
+          {
+            "name": "jira_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jira Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "jira-proxy"
+        ],
+        "summary": "Transparent JIRA proxy",
+        "description": "Forward the request unchanged to ``$JIRA_URL/<jira_path>``.\n\nSend the same headers as to JIRA itself, e.g.\n``Authorization: Bearer <PAT>`` or ``Authorization: Basic <base64(user:token)>``.",
+        "operationId": "proxy_jira_jira_proxy__jira_path__delete",
+        "parameters": [
+          {
+            "name": "jira_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jira Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "jira-proxy"
+        ],
+        "summary": "Transparent JIRA proxy",
+        "description": "Forward the request unchanged to ``$JIRA_URL/<jira_path>``.\n\nSend the same headers as to JIRA itself, e.g.\n``Authorization: Bearer <PAT>`` or ``Authorization: Basic <base64(user:token)>``.",
+        "operationId": "proxy_jira_jira_proxy__jira_path__delete",
+        "parameters": [
+          {
+            "name": "jira_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jira Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "jira-proxy"
+        ],
+        "summary": "Transparent JIRA proxy",
+        "description": "Forward the request unchanged to ``$JIRA_URL/<jira_path>``.\n\nSend the same headers as to JIRA itself, e.g.\n``Authorization: Bearer <PAT>`` or ``Authorization: Basic <base64(user:token)>``.",
+        "operationId": "proxy_jira_jira_proxy__jira_path__delete",
+        "parameters": [
+          {
+            "name": "jira_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jira Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "jira-proxy"
+        ],
+        "summary": "Transparent JIRA proxy",
+        "description": "Forward the request unchanged to ``$JIRA_URL/<jira_path>``.\n\nSend the same headers as to JIRA itself, e.g.\n``Authorization: Bearer <PAT>`` or ``Authorization: Basic <base64(user:token)>``.",
+        "operationId": "proxy_jira_jira_proxy__jira_path__delete",
+        "parameters": [
+          {
+            "name": "jira_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jira Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "jira-proxy"
+        ],
+        "summary": "Transparent JIRA proxy",
+        "description": "Forward the request unchanged to ``$JIRA_URL/<jira_path>``.\n\nSend the same headers as to JIRA itself, e.g.\n``Authorization: Bearer <PAT>`` or ``Authorization: Basic <base64(user:token)>``.",
+        "operationId": "proxy_jira_jira_proxy__jira_path__delete",
+        "parameters": [
+          {
+            "name": "jira_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jira Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -690,7 +926,7 @@
           "attachments": {
             "items": {
               "type": "string",
-              "format": "binary"
+              "contentMediaType": "application/octet-stream"
             },
             "type": "array",
             "title": "Attachments"
@@ -772,7 +1008,7 @@
           "attachments": {
             "items": {
               "type": "string",
-              "format": "binary"
+              "contentMediaType": "application/octet-stream"
             },
             "type": "array",
             "title": "Attachments"
@@ -2590,6 +2826,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",

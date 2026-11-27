@@ -7,6 +7,7 @@ to Confluence Storage Format and publishing to Confluence.
 
 import logging
 import json
+import os
 import re
 from typing import Any, Dict, List, Optional
 
@@ -19,6 +20,7 @@ from pathlib import Path as PathLib
 from md2cf.converter import MarkdownToConfluence
 from md2cf.api.confluence import ConfluenceClient
 from md2cf.api.jira import JiraClient
+from md2cf.jira_proxy import router as jira_proxy_router
 
 
 logger = logging.getLogger(__name__)
@@ -833,14 +835,22 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Add CORS middleware
+# Add CORS middleware.
+# CORS_ALLOW_ORIGINS: comma-separated list of allowed origins (default "*").
+# CORS_ALLOW_ORIGIN_REGEX: optional regex, e.g. "^https://superprod\\.localhost(:[0-9]+)?$".
+# Restrict these when the JIRA proxy is used: it forwards cookies, so with "*"
+# any website could send credentialed requests to JIRA through it.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=[o.strip() for o in os.environ.get("CORS_ALLOW_ORIGINS", "*").split(",") if o.strip()],
+    allow_origin_regex=os.environ.get("CORS_ALLOW_ORIGIN_REGEX") or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(jira_proxy_router)
 
 
 @app.get("/", response_model=HealthResponse)
@@ -1753,8 +1763,6 @@ async def list_jira_projects(request: JiraProjectsRequest) -> JiraProjectsRespon
             token=request.token,
             cloud=request.cloud
         )
-
-        print("Fetching JIRA projects...", request.token)
 
         # Get projects
         projects = client.get_projects(include_archived=request.include_archived)
